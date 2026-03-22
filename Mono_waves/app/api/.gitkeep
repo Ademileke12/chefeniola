@@ -1,0 +1,10 @@
+# API routes will be added here
+# Structure:
+# - /api/products
+# - /api/cart
+# - /api/checkout
+# - /api/orders
+# - /api/webhooks
+# - /api/upload
+# - /api/admin
+# - /api/gelato
