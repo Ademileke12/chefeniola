@@ -3,26 +3,29 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/admin/DashboardLayout'
-import { ArrowLeft, Package, User, CreditCard, Truck, Download } from 'lucide-react'
+import { ArrowLeft, Package, User, CreditCard, Truck, Download, Send } from 'lucide-react'
 
 interface OrderDetails {
   id: string
-  order_number: string
-  customer_name: string
-  customer_email: string
+  orderNumber: string
+  customerName: string
+  customerEmail: string
   total: number
   status: string
-  created_at: string
+  createdAt: string
   items: any[]
-  tracking_number?: string | null
+  trackingNumber?: string | null
   carrier?: string | null
-  shipping_address?: {
-    line1: string
-    line2?: string
+  shippingAddress?: {
+    firstName: string
+    lastName: string
+    addressLine1: string
+    addressLine2?: string
     city: string
     state: string
-    postal_code: string
+    postCode: string
     country: string
+    phone: string
   }
 }
 
@@ -32,6 +35,9 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -88,6 +94,41 @@ export default function OrderDetailPage() {
     return statusColors[status] || 'bg-gray-100 text-gray-800'
   }
 
+  const handleSubmitToGelato = async () => {
+    if (!order) return
+
+    setSubmitting(true)
+    setSubmitError(null)
+    setSubmitSuccess(false)
+
+    try {
+      const response = await fetch(`/api/orders/${order.id}/submit-to-gelato`, {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit order')
+      }
+
+      setSubmitSuccess(true)
+      
+      // Reload order to get updated status
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+
+    } catch (error) {
+      console.error('Failed to submit order to Gelato:', error)
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit order')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const canSubmitToGelato = order?.status === 'payment_confirmed'
+
   if (loading) {
     return (
       <DashboardLayout activeSection="orders">
@@ -130,17 +171,44 @@ export default function OrderDetailPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Order {order.order_number}</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Order {order.orderNumber}</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Placed on {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString()}
+                Placed on {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString()}
               </p>
             </div>
           </div>
-          <button className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors font-medium">
-            <Download className="w-4 h-4" />
-            Download Invoice
-          </button>
+          <div className="flex items-center gap-3">
+            {canSubmitToGelato && (
+              <button
+                onClick={handleSubmitToGelato}
+                disabled={submitting}
+                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-4 h-4" />
+                {submitting ? 'Submitting...' : 'Submit to Gelato'}
+              </button>
+            )}
+            <button className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors font-medium">
+              <Download className="w-4 h-4" />
+              Download Invoice
+            </button>
+          </div>
         </div>
+
+        {/* Success/Error Messages */}
+        {submitSuccess && (
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+            <p className="font-medium">Order successfully submitted to Gelato!</p>
+            <p className="text-sm mt-1">The order will be processed and shipped by Gelato. Page will reload...</p>
+          </div>
+        )}
+
+        {submitError && (
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+            <p className="font-medium">Failed to submit order</p>
+            <p className="text-sm mt-1">{submitError}</p>
+          </div>
+        )}
 
         {/* Status */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -173,7 +241,7 @@ export default function OrderDetailPage() {
             </div>
             <div>
               <div className="text-sm text-gray-500 mb-1">Tracking Number</div>
-              <div className="font-mono text-gray-900 font-medium">{order.tracking_number || 'Pending shipment'}</div>
+              <div className="font-mono text-gray-900 font-medium">{order.trackingNumber || 'Pending shipment'}</div>
             </div>
           </div>
         </div>
@@ -190,11 +258,11 @@ export default function OrderDetailPage() {
             <div className="space-y-3">
               <div>
                 <div className="text-sm text-gray-500">Name</div>
-                <div className="font-medium text-gray-900">{order.customer_name}</div>
+                <div className="font-medium text-gray-900">{order.customerName}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-500">Email</div>
-                <div className="font-medium text-gray-900">{order.customer_email}</div>
+                <div className="font-medium text-gray-900">{order.customerEmail}</div>
               </div>
             </div>
           </div>
@@ -207,14 +275,14 @@ export default function OrderDetailPage() {
               </div>
               <h2 className="text-lg font-semibold text-gray-900">Shipping Address</h2>
             </div>
-            {order.shipping_address ? (
+            {order.shippingAddress ? (
               <div className="text-gray-900">
-                <div>{order.shipping_address.line1}</div>
-                {order.shipping_address.line2 && <div>{order.shipping_address.line2}</div>}
+                <div>{order.shippingAddress.addressLine1}</div>
+                {order.shippingAddress.addressLine2 && <div>{order.shippingAddress.addressLine2}</div>}
                 <div>
-                  {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}
+                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postCode}
                 </div>
-                <div>{order.shipping_address.country}</div>
+                <div>{order.shippingAddress.country}</div>
               </div>
             ) : (
               <div className="text-gray-500">No shipping address provided</div>
@@ -237,18 +305,18 @@ export default function OrderDetailPage() {
                 <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                      {item.preview_url ? (
-                        <img src={item.preview_url} alt={item.product_name} className="w-full h-full object-cover" />
+                      {item.previewUrl ? (
+                        <img src={item.previewUrl} alt={item.productName} className="w-full h-full object-cover" />
                       ) : (
                         <Package className="w-8 h-8 text-gray-400" />
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">{item.product_name || 'Product'}</div>
+                      <div className="font-medium text-gray-900">{item.productName || 'Product'}</div>
                       <div className="text-xs text-gray-500 flex flex-col">
                         <span>Size: {item.size || 'N/A'}</span>
                         <span>Color: {item.color || 'N/A'}</span>
-                        <span>Gelato ID: <code className="bg-gray-100 px-1 rounded">{item.gelato_order_item_id || 'N/A'}</code></span>
+                        <span>Gelato UID: <code className="bg-gray-100 px-1 rounded">{item.gelatoProductUid || 'N/A'}</code></span>
                       </div>
                       <div className="text-sm text-gray-600 mt-1 font-medium">Quantity: {item.quantity || 1}</div>
                     </div>
