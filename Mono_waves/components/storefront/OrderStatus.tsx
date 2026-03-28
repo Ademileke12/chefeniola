@@ -91,11 +91,37 @@ export default function OrderStatus({ order }: OrderStatusProps) {
             {order.status.replace(/_/g, ' ')}
           </span>
         </div>
-        <p className="text-gray-600">
-          {order.status === 'cancelled' && 'This order has been cancelled.'}
-          {order.status === 'failed' && 'There was an issue processing this order. Please contact support.'}
-          {order.status === 'pending' && 'Your order is pending payment confirmation.'}
-        </p>
+        
+        {order.status === 'cancelled' && (
+          <div className="bg-red-50 border border-red-200 p-4 rounded">
+            <p className="text-red-900 font-medium mb-2">This order has been cancelled</p>
+            <p className="text-red-800 text-sm">
+              A full refund has been issued to your original payment method. 
+              Please allow 5-10 business days for the refund to appear in your account.
+            </p>
+            <p className="text-red-800 text-sm mt-2">
+              If you have any questions, please contact our support team.
+            </p>
+          </div>
+        )}
+        
+        {order.status === 'failed' && (
+          <div className="bg-red-50 border border-red-200 p-4 rounded">
+            <p className="text-red-900 font-medium mb-2">There was an issue processing this order</p>
+            <p className="text-red-800 text-sm">
+              Please contact our support team for assistance.
+            </p>
+          </div>
+        )}
+        
+        {order.status === 'pending' && (
+          <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
+            <p className="text-yellow-900 font-medium mb-2">Your order is pending payment confirmation</p>
+            <p className="text-yellow-800 text-sm">
+              We're waiting for payment confirmation. This usually takes a few minutes.
+            </p>
+          </div>
+        )}
       </div>
     );
   }

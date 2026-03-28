@@ -247,6 +247,47 @@ export async function handlePaymentFailure(
 }
 
 /**
+ * Refund a payment
+ * 
+ * Used when cancelling orders before fulfillment
+ */
+export async function refundPayment(
+  paymentIntentId: string,
+  reason?: string
+): Promise<Stripe.Refund> {
+  if (!paymentIntentId) {
+    throw new StripeServiceError('Payment intent ID is required', 'INVALID_INPUT')
+  }
+
+  const stripe = getStripeClient()
+
+  try {
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      reason: reason === 'fraudulent' ? 'fraudulent' : 'requested_by_customer',
+      metadata: {
+        refund_reason: reason || 'Order cancelled by admin'
+      }
+    })
+
+    return refund
+  } catch (error) {
+    if (error instanceof Stripe.errors.StripeError) {
+      throw new StripeServiceError(
+        `Stripe refund error: ${error.message}`,
+        error.code,
+        error.statusCode
+      )
+    }
+
+    throw new StripeServiceError(
+      `Failed to process refund: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'REFUND_FAILED'
+    )
+  }
+}
+
+/**
  * Stripe service object for easier imports
  */
 export const stripeService = {
@@ -254,4 +295,5 @@ export const stripeService = {
   verifyWebhookSignature,
   handlePaymentSuccess,
   handlePaymentFailure,
+  refundPayment,
 }
