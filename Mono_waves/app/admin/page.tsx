@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/admin/DashboardLayout'
 import MetricCard from '@/components/admin/MetricCard'
 import DataTable from '@/components/admin/DataTable'
 import InventoryForm from '@/components/admin/InventoryForm'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { 
   DashboardMetrics, 
   DashboardResponse, 
@@ -197,7 +198,7 @@ export default function AdminDashboardPage() {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/admin/dashboard')
+        const response = await authenticatedFetch('/api/admin/dashboard')
         
         if (!response.ok) {
           throw new Error(`Failed to fetch dashboard data: ${response.statusText}`)
@@ -263,16 +264,17 @@ export default function AdminDashboardPage() {
 
   return (
     <DashboardLayout activeSection="dashboard">
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
           <button
             onClick={handleDownloadReport}
-            className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors font-medium"
+            className="flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base shadow-lg active:scale-95"
           >
             <Download className="w-4 h-4" />
-            DOWNLOAD REPORT
+            <span className="hidden sm:inline">DOWNLOAD REPORT</span>
+            <span className="sm:hidden">REPORT</span>
           </button>
         </div>
 
@@ -305,14 +307,14 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Left Column - Inventory Entry */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-2 lg:order-1">
             <InventoryForm onSubmit={handleInventorySubmit} />
           </div>
 
           {/* Right Column - Tables */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8 order-1 lg:order-2">
             {/* Active Catalogue */}
             <DataTable
               title="Active Catalogue"

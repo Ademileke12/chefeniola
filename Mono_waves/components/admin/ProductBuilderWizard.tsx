@@ -10,10 +10,13 @@ import {
     Plus,
     Search,
     Image as ImageIcon,
-    CheckCircle2
+    CheckCircle2,
+    AlertCircle,
+    X
 } from 'lucide-react'
 import { GelatoProduct, CreateProductData, ProductVariant } from '@/types/product'
 import Image from 'next/image'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 
 interface ProductBuilderWizardProps {
     gelatoProducts: GelatoProduct[]
@@ -44,6 +47,7 @@ export default function ProductBuilderWizard({
     const [designUrl, setDesignUrl] = useState<string>('')
     const [generatedImages, setGeneratedImages] = useState<string[]>([])
     const [uploading, setUploading] = useState(false)
+    const [uploadError, setUploadError] = useState<string | null>(null)
 
     // Variant Selection State
     const [selectedSizes, setSelectedSizes] = useState<string[]>([])
@@ -51,9 +55,39 @@ export default function ProductBuilderWizard({
 
     // Step 1: Base Product Selection
     const [searchQuery, setSearchQuery] = useState('')
-    const filteredProducts = gelatoProducts.filter(p =>
-        p.title.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const [selectedCategory, setSelectedCategory] = useState<string>('all')
+    
+    const CATEGORIES = [
+        { id: 'all', label: 'All Categories' },
+        { id: 'mens', label: "Men's Clothing" },
+        { id: 'womens', label: "Women's Clothing" },
+        { id: 'kids', label: "Kids & Baby" },
+        { id: 'unisex', label: "Unisex" },
+    ]
+    
+    const filteredProducts = gelatoProducts.filter(p => {
+        // Filter by search query
+        const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            p.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            p.brand?.toLowerCase().includes(searchQuery.toLowerCase())
+        
+        // Filter by category
+        let matchesCategory = true
+        if (selectedCategory !== 'all') {
+            const category = p.category?.toLowerCase() || ''
+            if (selectedCategory === 'mens') {
+                matchesCategory = category.includes("men's") || category.includes('men')
+            } else if (selectedCategory === 'womens') {
+                matchesCategory = category.includes("women's") || category.includes('women') || category.includes('ladies')
+            } else if (selectedCategory === 'kids') {
+                matchesCategory = category.includes('kids') || category.includes('baby')
+            } else if (selectedCategory === 'unisex') {
+                matchesCategory = category.includes('unisex')
+            }
+        }
+        
+        return matchesSearch && matchesCategory
+    })
 
     const handleSelectGelato = (product: GelatoProduct) => {
         setSelectedGelato(product)
@@ -74,22 +108,30 @@ export default function ProductBuilderWizard({
 
         setDesignFile(file)
         setUploading(true)
+        setUploadError(null)
 
         try {
             const formData = new FormData()
             formData.append('file', file)
 
-            const response = await fetch('/api/upload', {
+            const response = await authenticatedFetch('/api/upload', {
                 method: 'POST',
                 body: formData,
             })
 
-            if (!response.ok) throw new Error('Upload failed')
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || errorData.details || 'Upload failed')
+            }
+            
             const data = await response.json()
             setDesignUrl(data.url)
+            setUploadError(null)
         } catch (err) {
             console.error('Upload error:', err)
-            alert('Failed to upload design file')
+            const errorMessage = err instanceof Error ? err.message : 'Failed to upload design file'
+            setUploadError(errorMessage)
+            setDesignUrl('')
         } finally {
             setUploading(false)
         }
@@ -101,11 +143,14 @@ export default function ProductBuilderWizard({
 
         setGenerating(true)
         try {
+            // Use the custom product name from details, not the Gelato title
+            const productName = details.name || selectedGelato.title
+            
             const response = await fetch('/api/ai/generate-mockups', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    productType: selectedGelato.title, // Pass full title, service will clean it
+                    productType: productName, // Use the custom product name
                     color: selectedColors[0] || 'white',
                     designUrl: designUrl,
                     count: 2
@@ -202,12 +247,14 @@ export default function ProductBuilderWizard({
                 {/* Step 1: Catalog */}
                 {currentStep === 1 && (
                     <div className="space-y-6">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Select Base Product</h2>
-                                <p className="text-gray-500">Pick a high-quality item from Gelato&apos;s catalog.</p>
-                            </div>
-                            <div className="relative w-64">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900">Select Base Product</h2>
+                            <p className="text-gray-500">Pick a high-quality item from Gelato&apos;s catalog.</p>
+                        </div>
+                        
+                        {/* Filters */}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                                 <input
                                     type="text"
@@ -217,6 +264,20 @@ export default function ProductBuilderWizard({
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white min-w-[200px]"
+                            >
+                                {CATEGORIES.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Results count */}
+                        <div className="text-sm text-gray-500">
+                            Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -233,10 +294,28 @@ export default function ProductBuilderWizard({
                                     <div className="p-4 bg-white border-t border-gray-50">
                                         <h3 className="text-xs font-bold text-gray-900 truncate uppercase tracking-tight">{p.title}</h3>
                                         <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">From ${p.basePrice}</p>
+                                        {p.category && (
+                                            <p className="text-[9px] text-gray-400 mt-1 uppercase tracking-wider">{p.category}</p>
+                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
+                        
+                        {filteredProducts.length === 0 && (
+                            <div className="text-center py-12">
+                                <p className="text-gray-500">No products found matching your criteria</p>
+                                <button
+                                    onClick={() => {
+                                        setSearchQuery('')
+                                        setSelectedCategory('all')
+                                    }}
+                                    className="mt-4 text-sm text-black hover:underline"
+                                >
+                                    Clear filters
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -363,7 +442,12 @@ export default function ProductBuilderWizard({
                         </div>
 
                         <div
-                            className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${designUrl ? 'border-green-500 bg-green-50/30' : 'border-gray-200 hover:border-black bg-gray-50'
+                            className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${
+                                uploadError 
+                                    ? 'border-red-500 bg-red-50/30' 
+                                    : designUrl 
+                                    ? 'border-green-500 bg-green-50/30' 
+                                    : 'border-gray-200 hover:border-black bg-gray-50'
                                 }`}
                         >
                             <input
@@ -376,19 +460,40 @@ export default function ProductBuilderWizard({
                             <label htmlFor="design-upload" className="cursor-pointer flex flex-col items-center">
                                 {uploading ? (
                                     <Loader2 className="h-12 w-12 text-black animate-spin mb-4" />
+                                ) : uploadError ? (
+                                    <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
                                 ) : designUrl ? (
                                     <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
                                 ) : (
                                     <Upload className="h-12 w-12 text-gray-400 mb-4" />
                                 )}
-                                <span className="text-lg font-semibold text-gray-900">
-                                    {uploading ? 'Uploading...' : designUrl ? 'Design Uploaded!' : 'Click to upload design'}
+                                <span className={`text-lg font-semibold ${uploadError ? 'text-red-900' : 'text-gray-900'}`}>
+                                    {uploading ? 'Uploading...' : uploadError ? 'Upload Failed' : designUrl ? 'Design Uploaded!' : 'Click to upload design'}
                                 </span>
-                                <p className="text-sm text-gray-500 mt-2">Maximum file size 10MB</p>
+                                <p className="text-sm text-gray-500 mt-2">
+                                    {uploadError ? 'Click to try again' : 'Maximum file size 10MB'}
+                                </p>
                             </label>
                         </div>
 
-                        {designUrl && (
+                        {/* Error Message */}
+                        {uploadError && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <h3 className="text-sm font-semibold text-red-900 mb-1">Upload Error</h3>
+                                    <p className="text-sm text-red-700">{uploadError}</p>
+                                </div>
+                                <button
+                                    onClick={() => setUploadError(null)}
+                                    className="text-red-500 hover:text-red-700"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        )}
+
+                        {designUrl && !uploadError && (
                             <div className="flex items-center justify-center">
                                 <div className="relative w-48 aspect-square border rounded-lg overflow-hidden bg-white shadow-sm">
                                     <Image src={designUrl} alt="Design preview" fill className="object-contain p-4" />

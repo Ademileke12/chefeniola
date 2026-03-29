@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/admin/DashboardLayout'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import {
     Mail,
     MessageSquare,
@@ -30,7 +31,7 @@ export default function AdminSupportPage() {
     const fetchTickets = async () => {
         try {
             setLoading(true)
-            const response = await fetch('/api/admin/support')
+            const response = await authenticatedFetch('/api/admin/support')
             if (!response.ok) throw new Error('Failed to fetch tickets')
             const data = await response.json()
             setTickets(data)
@@ -41,10 +42,10 @@ export default function AdminSupportPage() {
         }
     }
 
-    const handleUpdateStatus = async (id: string, status: 'open' | 'fixed') => {
+    const handleUpdateStatus = async (id: string, status: 'open' | 'in_progress' | 'resolved' | 'closed') => {
         try {
             setUpdating(true)
-            const response = await fetch(`/api/admin/support/${id}`, {
+            const response = await authenticatedFetch(`/api/admin/support/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
@@ -66,12 +67,12 @@ export default function AdminSupportPage() {
 
         try {
             setUpdating(true)
-            const response = await fetch(`/api/admin/support/${selectedTicket.id}`, {
+            const response = await authenticatedFetch(`/api/admin/support/${selectedTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    admin_reply: adminReply,
-                    status: 'fixed' // Automatically mark as fixed when replying if desired, or keep open
+                    admin_notes: adminReply,
+                    status: 'resolved' // Automatically mark as resolved when replying
                 })
             })
             if (!response.ok) throw new Error('Failed to send reply')
@@ -92,7 +93,7 @@ export default function AdminSupportPage() {
         if (!confirm('Are you sure you want to delete this complaint?')) return
 
         try {
-            const response = await fetch(`/api/admin/support/${id}`, { method: 'DELETE' })
+            const response = await authenticatedFetch(`/api/admin/support/${id}`, { method: 'DELETE' })
             if (!response.ok) throw new Error('Failed to delete')
 
             setTickets(prev => prev.filter(t => t.id !== id))
@@ -120,7 +121,7 @@ export default function AdminSupportPage() {
                         <div className="bg-white border border-gray-200 px-4 py-2 rounded-lg shadow-sm flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                             <span className="text-sm font-medium text-gray-700">
-                                {tickets.filter(t => t.status === 'fixed').length} Resolved
+                                {tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length} Resolved
                             </span>
                         </div>
                     </div>
@@ -153,7 +154,7 @@ export default function AdminSupportPage() {
                                                 <div className={`w-2 h-2 rounded-full ${ticket.status === 'open' ? 'bg-amber-400 animate-pulse' : 'bg-green-400'}`} />
                                             </div>
                                             <h3 className="font-medium text-gray-900 line-clamp-1">{ticket.subject}</h3>
-                                            <p className="text-xs text-gray-500 line-clamp-1">{ticket.customer_email}</p>
+                                            <p className="text-xs text-gray-500 line-clamp-1">{ticket.email}</p>
                                         </button>
                                     ))}
                                 </div>
@@ -172,12 +173,12 @@ export default function AdminSupportPage() {
                                         </div>
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-900">{selectedTicket.subject}</h2>
-                                            <p className="text-sm text-gray-500 font-medium">{selectedTicket.customer_email}</p>
+                                            <p className="text-sm text-gray-500 font-medium">{selectedTicket.email}</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => handleUpdateStatus(selectedTicket.id, selectedTicket.status === 'open' ? 'fixed' : 'open')}
+                                            onClick={() => handleUpdateStatus(selectedTicket.id, selectedTicket.status === 'open' ? 'resolved' : 'open')}
                                             disabled={updating}
                                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${selectedTicket.status === 'open'
                                                     ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
@@ -185,7 +186,7 @@ export default function AdminSupportPage() {
                                                 }`}
                                         >
                                             {selectedTicket.status === 'open' ? <Clock className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                                            {selectedTicket.status === 'open' ? 'Mark Fixed' : 'Reopen'}
+                                            {selectedTicket.status === 'open' ? 'Mark Resolved' : 'Reopen'}
                                         </button>
                                         <button
                                             onClick={() => handleDelete(selectedTicket.id)}
@@ -205,7 +206,7 @@ export default function AdminSupportPage() {
                                         </div>
                                         <div className="bg-gray-50 rounded-2xl rounded-tl-none p-6 flex-1 border border-gray-100">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="font-semibold text-gray-900">{selectedTicket.customer_name || 'Customer'}</span>
+                                                <span className="font-semibold text-gray-900">{selectedTicket.name || 'Customer'}</span>
                                                 <span className="text-xs text-gray-400">{new Date(selectedTicket.created_at).toLocaleString()}</span>
                                             </div>
                                             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedTicket.message}</p>
@@ -213,7 +214,7 @@ export default function AdminSupportPage() {
                                     </div>
 
                                     {/* Admin Reply History */}
-                                    {selectedTicket.admin_reply && (
+                                    {selectedTicket.admin_notes && (
                                         <div className="flex gap-4 flex-row-reverse">
                                             <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center shrink-0">
                                                 <div className="text-[10px] text-white font-bold">ADM</div>
@@ -222,13 +223,13 @@ export default function AdminSupportPage() {
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="font-semibold italic">MonoVerse Admin</span>
                                                 </div>
-                                                <p className="leading-relaxed whitespace-pre-wrap">{selectedTicket.admin_reply}</p>
+                                                <p className="leading-relaxed whitespace-pre-wrap">{selectedTicket.admin_notes}</p>
                                             </div>
                                         </div>
                                     )}
 
                                     {/* Reply Editor */}
-                                    {!selectedTicket.admin_reply && (
+                                    {!selectedTicket.admin_notes && (
                                         <div className="mt-8 border-t border-gray-100 pt-8">
                                             <div className="flex items-center gap-2 mb-4">
                                                 <Mail className="w-4 h-4 text-gray-400" />

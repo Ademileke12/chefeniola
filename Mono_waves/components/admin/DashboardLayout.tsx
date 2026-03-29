@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import { Menu, X } from 'lucide-react'
 
@@ -12,28 +12,50 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children, activeSection }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Close sidebar when screen size changes to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(false)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [sidebarOpen])
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      {/* Mobile header bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-30 flex items-center px-4">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 bg-white rounded-md shadow-md hover:bg-gray-50 transition-colors"
+          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
           aria-label="Toggle menu"
         >
-          {sidebarOpen ? (
-            <X className="w-5 h-5 text-gray-600" />
-          ) : (
-            <Menu className="w-5 h-5 text-gray-600" />
-          )}
+          <Menu className="w-6 h-6 text-gray-700" />
         </button>
+        <h1 className="ml-3 text-lg font-bold text-gray-900">Admin Panel</h1>
       </div>
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
       

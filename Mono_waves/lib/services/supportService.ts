@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { DatabaseSupportTicket } from '@/types/database'
 
-export type CreateSupportTicketData = Pick<DatabaseSupportTicket, 'customer_email' | 'customer_name' | 'subject' | 'message'>
+export type CreateSupportTicketData = Pick<DatabaseSupportTicket, 'email' | 'name' | 'category' | 'subject' | 'message'>
 
 export const supportService = {
     /**

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/admin/DashboardLayout'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { ArrowLeft, Package, User, CreditCard, Truck, Download, Send, XCircle } from 'lucide-react'
 
 interface OrderDetails {
@@ -49,7 +50,7 @@ export default function OrderDetailPage() {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/orders/${params.id}`)
+        const response = await authenticatedFetch(`/api/orders/${params.id}`)
 
         if (!response.ok) {
           throw new Error('Failed to fetch order details')

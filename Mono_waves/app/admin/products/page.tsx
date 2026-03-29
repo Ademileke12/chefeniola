@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
 import ProductTable from '@/components/admin/ProductTable'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { Product } from '@/types/product'
 
 export default function ProductsPage() {
@@ -22,7 +23,7 @@ export default function ProductsPage() {
       setLoading(true)
       setError(null)
       
-      const response = await fetch('/api/products?includeUnpublished=true')
+      const response = await authenticatedFetch('/api/products?includeUnpublished=true')
       
       if (!response.ok) {
         throw new Error('Failed to fetch products')
@@ -49,7 +50,7 @@ export default function ProductsPage() {
     }
 
     try {
-      const response = await fetch(`/api/products/${productId}`, {
+      const response = await authenticatedFetch(`/api/products/${productId}`, {
         method: 'DELETE',
       })
 

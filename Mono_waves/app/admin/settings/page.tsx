@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/admin/DashboardLayout'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { Save, Key, Bell, Globe, Shield } from 'lucide-react'
 
 export default function SettingsPage() {
@@ -29,7 +30,7 @@ export default function SettingsPage() {
     const fetchSettings = async () => {
       try {
         setLoading(true)
-        const response = await fetch('/api/admin/settings')
+        const response = await authenticatedFetch('/api/admin/settings')
         if (!response.ok) throw new Error('Failed to fetch settings')
         const data = await response.json()
 
@@ -56,7 +57,7 @@ export default function SettingsPage() {
     setSuccessMessage(null)
 
     try {
-      const response = await fetch('/api/admin/settings', {
+      const response = await authenticatedFetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

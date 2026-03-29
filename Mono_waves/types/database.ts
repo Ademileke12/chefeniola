@@ -72,12 +72,14 @@ export interface DatabaseWebhookLog {
 
 export interface DatabaseSupportTicket {
   id: string
-  customer_email: string
-  customer_name: string | null
+  email: string
+  name: string | null
+  category: string
   subject: string
   message: string
-  status: 'open' | 'fixed'
-  admin_reply: string | null
+  status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  priority: string | null
+  admin_notes: string | null
   created_at: string
   updated_at: string
 }

@@ -90,9 +90,22 @@ export class GelatoApiError extends Error {
 export async function getProductCatalog(): Promise<GelatoProductDetails[]> {
   try {
     // Gelato has separate catalogs for different product types
-    // We need to fetch from multiple catalogs to get all clothing items
-    const catalogs = ['t-shirts', 'hoodies', 'apparel']
+    // Fetch from multiple catalogs to get a wide variety of clothing items
+    const catalogs = [
+      't-shirts',
+      'hoodies',
+      'sweatshirts',
+      'tank-tops',
+      'long-sleeve-shirts',
+      'polo-shirts',
+      'apparel',
+      'activewear',
+      'kids-clothing',
+      'baby-clothing'
+    ]
     const allProducts: GelatoProductDetails[] = []
+    let successfulCatalogs = 0
+    let failedCatalogs = 0
 
     for (const catalogUid of catalogs) {
       try {
@@ -108,14 +121,20 @@ export async function getProductCatalog(): Promise<GelatoProductDetails[]> {
         )
 
         if (productsResponse.products && productsResponse.products.length > 0) {
-          console.log(`  Found ${productsResponse.products.length} products in ${catalogUid}`)
+          console.log(`  ✓ Found ${productsResponse.products.length} products in ${catalogUid}`)
           allProducts.push(...productsResponse.products)
+          successfulCatalogs++
+        } else {
+          console.log(`  ⚠ No products found in ${catalogUid}`)
         }
       } catch (error) {
-        console.error(`Failed to fetch from ${catalogUid} catalog:`, error)
+        console.error(`  ✗ Failed to fetch from ${catalogUid} catalog:`, error instanceof Error ? error.message : error)
+        failedCatalogs++
         // Continue with other catalogs even if one fails
       }
     }
+
+    console.log(`\nCatalog fetch summary: ${successfulCatalogs} successful, ${failedCatalogs} failed`)
 
     // Filter out hats and other accessories we don't want
     const excludeKeywords = [

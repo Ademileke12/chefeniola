@@ -12,18 +12,19 @@ export async function POST(request: NextRequest) {
         if (securityError) return securityError
 
         const body = await request.json()
-        const { customer_email, customer_name, subject, message } = body
+        const { email, name, category, subject, message } = body
 
-        if (!customer_email || !subject || !message) {
+        if (!email || !category || !subject || !message) {
             return NextResponse.json(
-                { error: 'Missing required fields: email, subject, or message' },
+                { error: 'Missing required fields: email, category, subject, or message' },
                 { status: 400 }
             )
         }
 
         const ticket = await supportService.createTicket({
-            customer_email,
-            customer_name: customer_name || null,
+            email,
+            name: name || null,
+            category,
             subject,
             message,
         })

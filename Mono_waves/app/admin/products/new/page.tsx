@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import ProductBuilderWizard from '@/components/admin/ProductBuilderWizard'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { GelatoProduct, CreateProductData } from '@/types/product'
 
 export default function NewProductPage() {
@@ -39,7 +40,7 @@ export default function NewProductPage() {
 
   const handleSubmit = async (data: CreateProductData) => {
     try {
-      const response = await fetch('/api/products', {
+      const response = await authenticatedFetch('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

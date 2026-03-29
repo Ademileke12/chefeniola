@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import ProductForm from '@/components/admin/ProductForm'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { Product, GelatoProduct, UpdateProductData } from '@/types/product'
 
 export default function EditProductPage() {
@@ -56,7 +57,7 @@ export default function EditProductPage() {
 
   const handleSubmit = async (data: UpdateProductData) => {
     try {
-      const response = await fetch(`/api/products/${productId}`, {
+      const response = await authenticatedFetch(`/api/products/${productId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

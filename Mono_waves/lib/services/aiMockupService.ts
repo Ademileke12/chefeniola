@@ -37,7 +37,7 @@ export const aiMockupService = {
 
     /**
      * Generates AI mockups for a product
-     * @param productType The type of product (e.g., "hoodie", "t-shirt")
+     * @param productType The type/name of product (e.g., "My Cool Hoodie Design")
      * @param color The color of the product
      * @param designUrl The URL of the design file to overlay (used in prompt context)
      * @param count Number of mockups to generate
@@ -56,10 +56,12 @@ export const aiMockupService = {
             return this.getPlaceholderMockups(productType, color);
         }
 
+        // Use the full product name/type directly in the prompt
+        // Extract garment type for better context
         const cleanedType = this.extractProductType(productType);
 
-        // Build dynamic prompt based on product details
-        const prompt = `Hyper-realistic ecommerce studio mockup of a ${color} ${cleanedType}. The product is being worn by a fashion model in a minimalist urban setting. Studio softbox lighting, clean neutral off-white background. Professional clothing photography, 8k resolution, highly detailed fabric texture. The mockup should look like a real product from a high-end streetwear brand.`;
+        // Build dynamic prompt that includes the product name
+        const prompt = `Hyper-realistic ecommerce studio mockup of a ${color} ${cleanedType} called "${productType}". The product is being worn by a fashion model in a minimalist urban setting. Studio softbox lighting, clean neutral off-white background. Professional clothing photography, 8k resolution, highly detailed fabric texture. The mockup should look like a real product from a high-end streetwear brand.`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for AI generation

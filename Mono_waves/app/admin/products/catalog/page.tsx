@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/admin/DashboardLayout'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { Search, Filter, Plus, Check } from 'lucide-react'
 
 interface GelatoProduct {
@@ -13,13 +14,15 @@ interface GelatoProduct {
   availableColors: Array<{ name: string; code: string }>
   basePrice: number
   category?: string
+  brand?: string
   imageUrl?: string
 }
 
 const CLOTHING_CATEGORIES = [
-  { id: 'mens', label: "Men's clothing", keywords: ['mens', 'men', 'male', 't-shirt', 'hoodie', 'sweatshirt'] },
-  { id: 'womens', label: "Women's clothing", keywords: ['womens', 'women', 'female', 'ladies', 't-shirt', 'hoodie', 'tank'] },
-  { id: 'kids', label: "Kids & baby clothing", keywords: ['kids', 'baby', 'children', 'youth', 'toddler', 'infant'] },
+  { id: 'mens', label: "Men's Clothing", keywords: ['men', 'male'] },
+  { id: 'womens', label: "Women's Clothing", keywords: ['women', 'female', 'ladies'] },
+  { id: 'kids', label: "Kids & Baby", keywords: ['kids', 'baby', 'children', 'youth', 'toddler'] },
+  { id: 'unisex', label: "Unisex", keywords: ['unisex'] },
 ]
 
 export default function ProductCatalogPage() {
@@ -54,29 +57,8 @@ export default function ProductCatalogPage() {
       
       const data = await response.json()
       
-      // Filter and categorize products
-      const clothingProducts = data.products
-        .filter((product: GelatoProduct) => {
-          const productText = `${product.uid} ${product.title} ${product.description}`.toLowerCase()
-          return CLOTHING_CATEGORIES.some(cat => 
-            cat.keywords.some(keyword => productText.includes(keyword))
-          )
-        })
-        .map((product: GelatoProduct) => {
-          // Assign category
-          const category = CLOTHING_CATEGORIES.find(cat =>
-            cat.keywords.some(keyword => 
-              `${product.uid} ${product.title}`.toLowerCase().includes(keyword)
-            )
-          )
-          
-          return {
-            ...product,
-            category: category?.id || 'other'
-          }
-        })
-      
-      setProducts(clothingProducts)
+      // Products are already properly categorized by the API
+      setProducts(data.products || [])
       
     } catch (error) {
       console.error('Failed to load catalog:', error)
@@ -91,7 +73,21 @@ export default function ProductCatalogPage() {
 
     // Filter by category
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === selectedCategory)
+      filtered = filtered.filter(p => {
+        const category = p.category?.toLowerCase() || ''
+        
+        // Match the category from the API response
+        if (selectedCategory === 'mens') {
+          return category.includes("men's") || category.includes('men')
+        } else if (selectedCategory === 'womens') {
+          return category.includes("women's") || category.includes('women') || category.includes('ladies')
+        } else if (selectedCategory === 'kids') {
+          return category.includes('kids') || category.includes('baby')
+        } else if (selectedCategory === 'unisex') {
+          return category.includes('unisex')
+        }
+        return false
+      })
     }
 
     // Filter by search query
@@ -100,7 +96,9 @@ export default function ProductCatalogPage() {
       filtered = filtered.filter(p =>
         p.title.toLowerCase().includes(query) ||
         p.uid.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query)
+        p.description.toLowerCase().includes(query) ||
+        p.brand?.toLowerCase().includes(query) ||
+        p.category?.toLowerCase().includes(query)
       )
     }
 
@@ -146,7 +144,7 @@ export default function ProductCatalogPage() {
           }
         }
 
-        const response = await fetch('/api/products', {
+        const response = await authenticatedFetch('/api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(productData)

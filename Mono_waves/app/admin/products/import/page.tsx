@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/admin/DashboardLayout'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { ArrowLeft, Save, Eye } from 'lucide-react'
 
 function ImportProductForm() {
@@ -46,7 +47,7 @@ function ImportProductForm() {
         }
       }
 
-      const response = await fetch('/api/products', {
+      const response = await authenticatedFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(productData)

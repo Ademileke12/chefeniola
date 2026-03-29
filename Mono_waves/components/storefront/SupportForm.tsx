@@ -5,8 +5,9 @@ import { Send, CheckCircle2 } from 'lucide-react'
 
 export default function SupportForm() {
     const [formData, setFormData] = useState({
-        customer_name: '',
-        customer_email: '',
+        name: '',
+        email: '',
+        category: 'general',
         subject: 'General Inquiry',
         message: '',
     })
@@ -32,8 +33,9 @@ export default function SupportForm() {
 
             setSubmitted(true)
             setFormData({
-                customer_name: '',
-                customer_email: '',
+                name: '',
+                email: '',
+                category: 'general',
                 subject: 'General Inquiry',
                 message: '',
             })
@@ -75,28 +77,36 @@ export default function SupportForm() {
                         type="text"
                         placeholder="Your Name"
                         required
-                        value={formData.customer_name}
-                        onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         className="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 text-sm transition-all"
                     />
                     <input
                         type="email"
                         placeholder="Email Address"
                         required
-                        value={formData.customer_email}
-                        onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 text-sm transition-all"
                     />
                     <select
-                        value={formData.subject}
-                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                         className="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 text-sm transition-all appearance-none"
                     >
-                        <option>General Inquiry</option>
-                        <option>Order Issue</option>
-                        <option>Design Query</option>
-                        <option>Other</option>
+                        <option value="general">General Inquiry</option>
+                        <option value="order">Order Issue</option>
+                        <option value="design">Design Query</option>
+                        <option value="other">Other</option>
                     </select>
+                    <input
+                        type="text"
+                        placeholder="Subject"
+                        required
+                        value={formData.subject}
+                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                        className="w-full px-4 py-2 bg-white/50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 text-sm transition-all"
+                    />
                     <textarea
                         placeholder="Describe your issue in detail..."
                         required

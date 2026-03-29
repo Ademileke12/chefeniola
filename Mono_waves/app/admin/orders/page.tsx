@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/admin/DashboardLayout'
 import DataTable from '@/components/admin/DataTable'
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { Eye, Download } from 'lucide-react'
 
 interface Order {
@@ -27,7 +28,7 @@ export default function OrdersPage() {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/orders')
+        const response = await authenticatedFetch('/api/orders')
         
         if (!response.ok) {
           throw new Error('Failed to fetch orders')
