@@ -36,6 +36,7 @@ export interface GelatoProduct {
   uid: string
   title: string
   description: string
+  category?: string
   availableSizes: string[]
   availableColors: GelatoColor[]
   basePrice: number

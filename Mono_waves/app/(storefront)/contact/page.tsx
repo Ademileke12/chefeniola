@@ -10,7 +10,7 @@ export default function ContactPage() {
             </h1>
 
             <p className="text-lg text-gray-600 font-light mb-12 max-w-2xl mx-auto">
-                We're here to assist you with your orders, inquiries, or just to chat about the future of fashion.
+                We&apos;re here to assist you with your orders, inquiries, or just to chat about the future of fashion.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
@@ -25,7 +25,7 @@ export default function ContactPage() {
             </div>
 
             <div className="mt-20 p-12 bg-[#F9F9F9] border border-gray-100 italic font-playfair text-xl text-gray-700">
-                "The best dialogue is one that starts with quality."
+                &ldquo;The best dialogue is one that starts with quality.&rdquo;
             </div>
         </div>
     )

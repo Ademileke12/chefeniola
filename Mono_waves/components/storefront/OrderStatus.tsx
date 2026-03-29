@@ -118,7 +118,7 @@ export default function OrderStatus({ order }: OrderStatusProps) {
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
             <p className="text-yellow-900 font-medium mb-2">Your order is pending payment confirmation</p>
             <p className="text-yellow-800 text-sm">
-              We're waiting for payment confirmation. This usually takes a few minutes.
+              We&apos;re waiting for payment confirmation. This usually takes a few minutes.
             </p>
           </div>
         )}

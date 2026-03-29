@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RefreshCw, Download, ExternalLink, AlertCircle } from 'lucide-react'
 import { DesignState } from '@/lib/services/designStateSerializer'
 
@@ -37,7 +37,7 @@ export default function MockupPreview({
   const backCanvasRef = useRef<HTMLCanvasElement>(null)
 
   // Render design overlay on mockup canvas (Requirements 6.2, 6.4)
-  const renderDesignOverlay = async (
+  const renderDesignOverlay = useCallback(async (
     canvas: HTMLCanvasElement,
     mockupType: string,
     designState?: DesignState
@@ -186,22 +186,22 @@ export default function MockupPreview({
     } catch (error) {
       console.error('Error rendering design overlay:', error)
     }
-  }
+  }, [selectedColor])
 
   // Update mockup previews when design state changes (Requirement 6.2)
   useEffect(() => {
     if (mockups.front && frontCanvasRef.current) {
       renderDesignOverlay(frontCanvasRef.current, 'front', designState)
     }
-  }, [mockups.front, designState, selectedColor])
+  }, [mockups.front, designState, renderDesignOverlay])
 
   useEffect(() => {
     if (mockups.back && backCanvasRef.current) {
       renderDesignOverlay(backCanvasRef.current, 'back', designState)
     }
-  }, [mockups.back, designState, selectedColor])
+  }, [mockups.back, designState, renderDesignOverlay])
 
-  const generateMockups = async () => {
+  const generateMockups = useCallback(async () => {
     if (!productUid) {
       setMockups({ loading: false, error: 'Product is required' })
       return
@@ -247,14 +247,14 @@ export default function MockupPreview({
         error: error instanceof Error ? error.message : 'Failed to generate mockups'
       })
     }
-  }
+  }, [productUid, designUrl, designState, selectedColor, onMockupGenerated])
 
   // Auto-generate mockups when product, design, or color changes (Requirement 6.3)
   useEffect(() => {
     if (productUid && (designUrl || designState)) {
       generateMockups()
     }
-  }, [productUid, designUrl, selectedColor, designState])
+  }, [productUid, designUrl, designState, generateMockups])
 
   const handleDownloadMockup = (url: string, type: string) => {
     // Get the appropriate canvas

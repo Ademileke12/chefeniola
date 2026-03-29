@@ -68,8 +68,7 @@ export default function ProductBuilderWizard({
     const filteredProducts = gelatoProducts.filter(p => {
         // Filter by search query
         const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            p.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            p.brand?.toLowerCase().includes(searchQuery.toLowerCase())
+                            p.description?.toLowerCase().includes(searchQuery.toLowerCase())
         
         // Filter by category
         let matchesCategory = true

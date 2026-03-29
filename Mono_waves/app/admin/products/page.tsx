@@ -95,8 +95,8 @@ export default function ProductsPage() {
     return (
       product.name.toLowerCase().includes(query) ||
       product.description?.toLowerCase().includes(query) ||
-      product.sizes.some(size => size.toLowerCase().includes(query)) ||
-      product.colors.some(color => color.name.toLowerCase().includes(query))
+      product.sizes?.some(size => size.toLowerCase().includes(query)) ||
+      product.colors?.some(color => color.name.toLowerCase().includes(query))
     )
   })
 

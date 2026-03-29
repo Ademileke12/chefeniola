@@ -119,7 +119,7 @@ export function OrderConfirmationPage() {
                     <p className="font-medium text-blue-900 mb-1">Order Being Reviewed</p>
                     <p className="text-sm text-blue-800">
                       Your order is being reviewed and will be sent to production within 24 hours. 
-                      You'll receive an email when your order enters production.
+                      You&apos;ll receive an email when your order enters production.
                     </p>
                   </div>
                 </div>

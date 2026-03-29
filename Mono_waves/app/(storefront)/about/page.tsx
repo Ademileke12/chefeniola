@@ -13,19 +13,19 @@ export default function AboutPage() {
                 <p>
                     Founded at the intersection of archival appreciation and modern textile innovation,
                     <span className="font-semibold text-gray-900 uppercase tracking-widest text-sm mx-1">Mono Verse</span>
-                    is a label dedicated to the pursuit of the "eternal garment." We believe that what we wear should be as
+                    is a label dedicated to the pursuit of the &ldquo;eternal garment.&rdquo; We believe that what we wear should be as
                     enduring as the memories we create in them.
                 </p>
 
                 <p>
                     Each collection is a dialogue between structured silhouettes and the fluid grace of human movement.
                     We source the finest sustainable materials, working with heritage mills to ensure that every stitch
-                    tells a story of quality over quantity. Our "made-to-order" approach ensures that we remain kind to
+                    tells a story of quality over quantity. Our &ldquo;made-to-order&rdquo; approach ensures that we remain kind to
                     the planet while providing you with something truly unique.
                 </p>
 
                 <blockquote className="border-l-2 border-black pl-6 py-2 my-12 italic text-2xl text-gray-900 font-playfair">
-                    "Luxury isn't about the price tag; it's about the time, craft, and soul invested in a single piece."
+                    &ldquo;Luxury isn&apos;t about the price tag; it&apos;s about the time, craft, and soul invested in a single piece.&rdquo;
                 </blockquote>
 
                 <p>
