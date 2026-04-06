@@ -40,14 +40,14 @@ async function fetchMetrics(): Promise<{ metrics: DashboardMetrics; errors: stri
 
       // Calculate revenue (all non-failed orders)
       metrics.totalRevenue = Number(ordersData
-        .filter((o) => o.status !== 'failed' && o.status !== 'cancelled')
-        .reduce((sum, o) => sum + Number(o.total || 0), 0)
+        .filter((o: any) => o.status !== 'failed' && o.status !== 'cancelled')
+        .reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
         .toFixed(2))
 
       // Calculate total sales (completed orders only)
       const completedStatuses = ['payment_confirmed', 'submitted_to_gelato', 'printing', 'shipped', 'delivered']
       metrics.totalSales = Number(ordersData
-        .filter((o) => completedStatuses.includes(o.status))
+        .filter((o: any) => completedStatuses.includes(o.status))
         .reduce((sum, o) => sum + Number(o.total || 0), 0)
         .toFixed(2))
     }
