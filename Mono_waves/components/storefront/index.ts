@@ -28,6 +28,5 @@ export { ProductAccordion } from './ProductAccordion';
 export { AddToCartSection } from './AddToCartSection';
 export { CartPage } from './CartPage';
 export { CheckoutPage } from './CheckoutPage';
-export { OrderConfirmationPage } from './OrderConfirmationPage';
 export { OrderStatusTimeline } from './OrderStatusTimeline';
 export { TrackOrderPage } from './TrackOrderPage';
