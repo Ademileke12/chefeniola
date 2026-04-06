@@ -1,0 +1,103 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    STRIPE WEBHOOK FLOW - THE PROBLEM                     ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+WHAT HAPPENS WHEN YOU COMPLETE A PAYMENT:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Step 1: User Completes Payment                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+   You → Browser → Stripe Checkout → Payment Success ✅
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Step 2: Stripe Redirects to Confirmation Page                           │
+└─────────────────────────────────────────────────────────────────────────┘
+   Stripe → Redirects → http://localhost:3000/confirmation?session_id=cs_test_xxx ✅
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Step 3: Stripe Tries to Send Webhook (THIS FAILS!)                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+   Stripe Servers (in the cloud)
+        │
+        │ POST /api/webhooks/stripe
+        │ with checkout.session.completed event
+        │
+        ↓
+   localhost:3000  ← ❌ NOT REACHABLE FROM INTERNET
+        │
+        │ Webhook never arrives
+        │ Order never created
+        ↓
+   Database: No order with session_id
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Step 4: Confirmation Page Loads                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+   Browser → GET /api/orders/session/cs_test_xxx
+        │
+        ↓
+   Database: No order found ❌
+        │
+        ↓
+   Page shows: "Order Not Found"
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    THE SOLUTION - STRIPE CLI                             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+WITH STRIPE CLI RUNNING:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Step 3: Stripe Sends Webhook (NOW IT WORKS!)                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+   Stripe Servers (in the cloud)
+        │
+        │ POST webhook event
+        │
+        ↓
+   Stripe CLI (acts as bridge) ✅
+        │
+        │ Forwards to localhost
+        │
+        ↓
+   localhost:3000/api/webhooks/stripe ✅
+        │
+        │ Webhook received!
+        │ Creates order in database
+        ↓
+   Database: Order created with session_id ✅
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Step 4: Confirmation Page Loads                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+   Browser → GET /api/orders/session/cs_test_xxx
+        │
+        ↓
+   Database: Order found! ✅
+        │
+        ↓
+   Page shows: Order details with items, shipping, total, etc. ✅
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         QUICK SETUP                                      ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Terminal 1 (Stripe CLI):
+  $ stripe listen --forward-to localhost:3000/api/webhooks/stripe
+  > Ready! Your webhook signing secret is whsec_xxxxxxxxxxxxx
+
+Terminal 2 (Update .env.local):
+  STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx  ← Use the new secret!
+
+Terminal 3 (Dev Server):
+  $ npm run dev
+
+Now test: Add to cart → Checkout → Pay → See order confirmation! ✅
