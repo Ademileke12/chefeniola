@@ -7,6 +7,7 @@ export interface Order {
   items: OrderItem[]
   subtotal: number
   shippingCost: number
+  tax: number
   total: number
   stripePaymentId: string
   stripeSessionId?: string
@@ -54,8 +55,10 @@ export interface ShippingAddress {
 export interface CreateOrderData {
   customerEmail: string
   stripePaymentId: string
+  stripeSessionId: string
   items: OrderItem[]
   shippingAddress: ShippingAddress
+  tax: number
   total: number
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { orderService } from '@/lib/services/orderService'
 import { requireAdmin } from '@/lib/auth'
+import { containsXSS, containsSQLInjection } from '@/lib/utils/validation'
 import type { OrderFilters } from '@/types/order'
 
 export async function GET(request: NextRequest) {
@@ -40,6 +41,21 @@ export async function GET(request: NextRequest) {
 
     const search = searchParams.get('search')
     if (search) {
+      // Validate for XSS and SQL injection
+      if (containsXSS(search)) {
+        return NextResponse.json(
+          { error: 'Invalid search query: contains potentially malicious content' },
+          { status: 400 }
+        )
+      }
+      
+      if (containsSQLInjection(search)) {
+        return NextResponse.json(
+          { error: 'Invalid search query: contains potentially malicious SQL patterns' },
+          { status: 400 }
+        )
+      }
+      
       filters.search = search.trim()
     }
 

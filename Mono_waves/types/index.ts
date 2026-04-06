@@ -122,6 +122,7 @@ export interface CheckoutData {
 export interface CheckoutSessionData extends CheckoutData {
   successUrl: string
   cancelUrl: string
+  automaticTax?: boolean // Enable Stripe automatic tax calculation
 }
 
 // Import types from other files for re-export

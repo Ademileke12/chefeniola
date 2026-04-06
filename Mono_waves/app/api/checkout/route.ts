@@ -3,15 +3,8 @@ import { stripeService } from '@/lib/services/stripeService'
 import { cartService } from '@/lib/services/cartService'
 import { securityCheck } from '@/lib/security'
 import { logger } from '@/lib/logger'
+import { isValidEmail } from '@/lib/utils/validation'
 import type { CheckoutData, ShippingAddress, CartItem } from '@/types'
-
-/**
- * Validate email format
- */
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
 
 /**
  * Validate shipping address
@@ -118,6 +111,12 @@ export async function POST(request: NextRequest) {
     // Get cart items from session
     const cart = await cartService.getCart(body.sessionId)
 
+    console.log('[Checkout] Cart retrieved:', {
+      sessionId: body.sessionId,
+      itemCount: cart.items?.length || 0,
+      items: cart.items
+    })
+
     if (!cart.items || cart.items.length === 0) {
       return NextResponse.json(
         { error: 'Cart is empty' },
@@ -149,15 +148,21 @@ export async function POST(request: NextRequest) {
       cartItems: cart.items,
       customerEmail: body.customerEmail,
       shippingAddress: body.shippingAddress,
-      successUrl: `${appUrl}/order/confirmation?session_id={CHECKOUT_SESSION_ID}`,
+      successUrl: `${appUrl}/confirmation?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${appUrl}/cart?cancelled=true`,
     }
+
+    console.log('[Checkout] Creating Stripe session with data:', {
+      itemCount: checkoutData.cartItems.length,
+      customerEmail: checkoutData.customerEmail,
+      hasShippingAddress: !!checkoutData.shippingAddress
+    })
 
     // Create Stripe checkout session (Requirements 6.4, 7.1)
     const checkoutUrl = await stripeService.createCheckoutSession(checkoutData)
 
     return NextResponse.json({
-      checkoutUrl,
+      url: checkoutUrl,
       message: 'Checkout session created successfully'
     })
 

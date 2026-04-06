@@ -39,6 +39,7 @@ export interface DatabaseOrder {
   items: any // JSONB
   subtotal: number
   shipping_cost: number
+  tax: number
   total: number
   stripe_payment_id: string
   stripe_session_id: string | null

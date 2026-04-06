@@ -22,8 +22,8 @@ export function TrackOrderPage() {
         throw new Error(error.error || 'Failed to track order')
       }
       
-      const orderData = await response.json()
-      setOrder(orderData)
+      const data = await response.json()
+      setOrder(data.order)
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Order not found. Please check your email and order number.')
     }

@@ -38,6 +38,7 @@ function toOrder(dbOrder: DatabaseOrder): Order {
     items: dbOrder.items as OrderItem[],
     subtotal: Number(dbOrder.subtotal),
     shippingCost: Number(dbOrder.shipping_cost),
+    tax: Number(dbOrder.tax),
     total: Number(dbOrder.total),
     stripePaymentId: dbOrder.stripe_payment_id,
     stripeSessionId: dbOrder.stripe_session_id || undefined,
@@ -67,6 +68,36 @@ function calculateSubtotal(items: OrderItem[]): number {
 }
 
 /**
+ * Calculate estimated delivery date (7-10 business days from order date)
+ * 
+ * Requirements: 1.3
+ */
+export function calculateEstimatedDelivery(orderDate: Date | string): string {
+  const date = typeof orderDate === 'string' ? new Date(orderDate) : orderDate
+  
+  // Add 7-10 business days (we'll use 8 days as the middle estimate)
+  let businessDaysToAdd = 8
+  let currentDate = new Date(date)
+  
+  while (businessDaysToAdd > 0) {
+    currentDate.setDate(currentDate.getDate() + 1)
+    // Skip weekends (0 = Sunday, 6 = Saturday)
+    const dayOfWeek = currentDate.getDay()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      businessDaysToAdd--
+    }
+  }
+  
+  // Format as readable date string
+  return currentDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+}
+
+/**
  * Create order after successful payment
  * 
  * Requirements: 7.4
@@ -79,6 +110,9 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
   if (!data.stripePaymentId) {
     throw new Error('Stripe payment ID is required')
   }
+  if (!data.stripeSessionId) {
+    throw new Error('Stripe session ID is required')
+  }
   if (!data.items || data.items.length === 0) {
     throw new Error('Order must contain at least one item')
   }
@@ -89,7 +123,8 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
   // Calculate subtotal and validate total
   const subtotal = calculateSubtotal(data.items)
   const shippingCost = 10.00 // Fixed shipping cost for now
-  const calculatedTotal = subtotal + shippingCost
+  const tax = data.tax || 0
+  const calculatedTotal = subtotal + shippingCost + tax
 
   // Generate order number
   const orderNumber = generateOrderNumber()
@@ -108,8 +143,10 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
       items: data.items,
       subtotal,
       shipping_cost: shippingCost,
+      tax,
       total: data.total,
       stripe_payment_id: data.stripePaymentId,
+      stripe_session_id: data.stripeSessionId,
       status: 'payment_confirmed',
     })
     .select()
@@ -144,6 +181,32 @@ export async function getOrderById(id: string): Promise<Order | null> {
       return null // Not found
     }
     throw new Error(`Failed to fetch order: ${error.message}`)
+  }
+
+  return data ? toOrder(data) : null
+}
+
+/**
+ * Get order by Stripe session ID (for confirmation page)
+ * 
+ * Requirements: 4.5
+ */
+export async function getOrderBySessionId(sessionId: string): Promise<Order | null> {
+  if (!sessionId) {
+    throw new Error('Session ID is required')
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('orders')
+    .select('*')
+    .eq('stripe_session_id', sessionId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null // Not found
+    }
+    throw new Error(`Failed to fetch order by session ID: ${error.message}`)
   }
 
   return data ? toOrder(data) : null
@@ -358,13 +421,37 @@ export async function submitToGelato(orderId: string): Promise<void> {
 }
 
 /**
+ * Generate carrier tracking URL
+ * 
+ * Requirements: 6.4
+ */
+export function getCarrierTrackingUrl(carrier: string, trackingNumber: string): string {
+  const normalizedCarrier = carrier.toLowerCase()
+  
+  if (normalizedCarrier.includes('usps')) {
+    return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`
+  } else if (normalizedCarrier.includes('ups')) {
+    return `https://www.ups.com/track?tracknum=${trackingNumber}`
+  } else if (normalizedCarrier.includes('fedex')) {
+    return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`
+  } else if (normalizedCarrier.includes('dhl')) {
+    return `https://www.dhl.com/en/express/tracking.html?AWB=${trackingNumber}`
+  }
+  
+  // Default: return a generic search URL
+  return `https://www.google.com/search?q=${encodeURIComponent(carrier + ' tracking ' + trackingNumber)}`
+}
+
+/**
  * Order service object for easier imports
  */
 export const orderService = {
   createOrder,
   getOrderById,
+  getOrderBySessionId,
   trackOrder,
   getAllOrders,
   updateOrderStatus,
   submitToGelato,
+  getCarrierTrackingUrl,
 }

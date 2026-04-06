@@ -39,15 +39,15 @@ export default function DashboardLayout({ children, activeSection }: DashboardLa
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-30 flex items-center px-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 sm:h-16 bg-white border-b border-gray-200 z-30 flex items-center px-4 sm:px-6 shadow-sm">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors active:scale-95 touch-manipulation"
           aria-label="Toggle menu"
         >
           <Menu className="w-6 h-6 text-gray-700" />
         </button>
-        <h1 className="ml-3 text-lg font-bold text-gray-900">Admin Panel</h1>
+        <h1 className="ml-3 text-lg sm:text-xl font-bold text-gray-900">Admin Panel</h1>
       </div>
 
       {/* Mobile overlay */}
@@ -67,7 +67,7 @@ export default function DashboardLayout({ children, activeSection }: DashboardLa
       
       {/* Main content area */}
       <main className="lg:ml-64 min-h-screen">
-        <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
+        <div className="p-4 sm:p-6 lg:p-8 pt-16 sm:pt-20 lg:pt-8">
           {children}
         </div>
       </main>

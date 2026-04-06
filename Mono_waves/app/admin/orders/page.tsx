@@ -21,6 +21,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -48,6 +49,37 @@ export default function OrdersPage() {
 
     loadOrders()
   }, [])
+
+  const handleClearAllOrders = async () => {
+    if (!confirm('Are you sure you want to delete ALL orders? This action cannot be undone!')) {
+      return
+    }
+
+    if (!confirm('This will permanently delete all order data. Are you absolutely sure?')) {
+      return
+    }
+
+    try {
+      setDeleting(true)
+      
+      // Delete each order
+      const deletePromises = orders.map(order => 
+        authenticatedFetch(`/api/orders/${order.id}`, { method: 'DELETE' })
+      )
+      
+      await Promise.all(deletePromises)
+      
+      // Reload orders
+      setOrders([])
+      alert('All orders have been deleted successfully')
+      
+    } catch (error) {
+      console.error('Failed to delete orders:', error)
+      alert('Failed to delete some orders. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const formatOrderStatus = (status: string): string => {
     const statusMap: { [key: string]: string } = {
@@ -151,8 +183,19 @@ export default function OrdersPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
-          <div className="text-sm text-gray-500">
-            Total: {orders.length} orders
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500">
+              Total: {orders.length} orders
+            </div>
+            {orders.length > 0 && (
+              <button
+                onClick={handleClearAllOrders}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {deleting ? 'Deleting...' : 'Clear All Orders'}
+              </button>
+            )}
           </div>
         </div>
 

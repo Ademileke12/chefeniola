@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fileService } from '@/lib/services/fileService'
 import { requireAdmin } from '@/lib/auth'
+import { validateCSRF } from '@/lib/security'
 
 export async function POST(request: NextRequest) {
   try {
+    // CSRF Protection
+    if (!validateCSRF(request)) {
+      return NextResponse.json(
+        { error: 'Forbidden: CSRF validation failed' },
+        { status: 403 }
+      )
+    }
+
     // Security check
     const { isAdmin } = await requireAdmin(request)
     if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -42,6 +51,21 @@ export async function POST(request: NextRequest) {
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: 'Invalid file type. Allowed: JPEG, PNG, SVG, PDF.' },
+        { status: 400 }
+      )
+    }
+
+    // Security: Validate file extension
+    const fileName = file.name.toLowerCase()
+    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.svg', '.pdf']
+    const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.php', '.asp', '.aspx', '.jsp', '.js', '.vbs', '.scr', '.com', '.pif']
+    
+    const hasAllowedExtension = ALLOWED_EXTENSIONS.some(ext => fileName.endsWith(ext))
+    const hasDangerousExtension = DANGEROUS_EXTENSIONS.some(ext => fileName.endsWith(ext))
+    
+    if (!hasAllowedExtension || hasDangerousExtension) {
+      return NextResponse.json(
+        { error: 'Invalid file extension. Dangerous file types are not allowed.' },
         { status: 400 }
       )
     }

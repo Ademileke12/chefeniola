@@ -63,3 +63,26 @@ export interface GelatoProductDetails {
   }
   supportedCountries?: string[]
 }
+
+export interface GelatoShippingQuoteRequest {
+  items: Array<{
+    productUid: string
+    quantity: number
+  }>
+  destination: {
+    country: string
+    state: string
+    postCode: string
+  }
+}
+
+export interface GelatoShippingQuoteResponse {
+  shippingOptions: Array<{
+    methodName: string
+    price: {
+      amount: number
+      currency: string
+    }
+    estimatedDeliveryDays: number
+  }>
+}

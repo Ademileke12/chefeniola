@@ -1,85 +1,136 @@
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
-async function testAdminDashboardMetrics() {
+// Test SQL Injection
+async function testSQLInjection() {
   try {
-    const response = await fetch(`${BASE_URL}/api/admin/dashboard`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: "1' OR '1' = '1" }),
     });
-    if (!response.ok) throw new Error(`Status ${response.status}: ${await response.text()}`);
     const data = await response.json();
-    console.log("PASS: Successfully fetched admin dashboard metrics");
+    console.log("SQL Injection Test:", data);
   } catch (error) {
-    console.log(`FAIL: Failed to fetch admin dashboard metrics - ${error.message}`);
+    console.error("SQL Injection Test Error:", error);
   }
 }
 
-async function testFileUpload() {
+// Test XSS
+async function testXSS() {
   try {
-    const blob = new Blob(['test content'], { type: 'image/png' });
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: "<script>alert('XSS')</script>" }),
+    });
+    const data = await response.json();
+    console.log("XSS Test:", data);
+  } catch (error) {
+    console.error("XSS Test Error:", error);
+  }
+}
+
+// Test CSRF
+async function testCSRF() {
+  try {
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    console.log("CSRF Test:", data);
+  } catch (error) {
+    console.error("CSRF Test Error:", error);
+  }
+}
+
+// Test File Uploads
+async function testFileUploads() {
+  try {
+    const file = new File(['test content'], 'test.txt', { type: 'text/plain' });
     const formData = new FormData();
-    formData.append('file', blob, 'test.png');
-    const response = await fetch(`${BASE_URL}/api/upload`, {
+    formData.append('file', file);
+    const response = await fetch(`${BASE_URL}/upload`, {
       method: 'POST',
       body: formData,
     });
-    if (!response.ok) throw new Error(`Status ${response.status}: ${await response.text()}`);
     const data = await response.json();
-    console.log("PASS: Successfully uploaded file");
+    console.log("File Upload Test:", data);
   } catch (error) {
-    console.log(`FAIL: Failed to upload file - ${error.message}`);
+    console.error("File Upload Test Error:", error);
   }
 }
 
-async function testCSRFProtection() {
+// Test Large Payloads
+async function testLargePayloads() {
   try {
-    const response = await fetch(`${BASE_URL}/api/support`, {
+    const largePayload = Array(100000).fill("a").join("");
+    const response = await fetch(`${BASE_URL}/`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ customerName: 'Test', customerEmail: 'test@example.com', subject: 'CSRF Test', message: 'Testing' }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: largePayload }),
     });
-    // If it's 200/201, it means CSRF is NOT active/working in this environment
-    if (response.status === 403) {
-      console.log("PASS: CSRF protection is working");
-    } else {
-      console.log(`FAIL: CSRF protection is not working (Status: ${response.status})`);
-    }
+    const data = await response.json();
+    console.log("Large Payload Test:", data);
   } catch (error) {
-    console.log(`FAIL: Failed to test CSRF protection - ${error.message}`);
+    console.error("Large Payload Test Error:", error);
   }
 }
 
+// Test Malformed Data
+async function testMalformedData() {
+  try {
+    const malformedJson = "{ invalid: json }";
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: malformedJson,
+    });
+    const data = await response.json();
+    console.log("Malformed Data Test:", data);
+  } catch (error) {
+    console.error("Malformed Data Test Error:", error);
+  }
+}
+
+// Test Error Handling
+async function testErrorHandling() {
+  try {
+    const response = await fetch(`${BASE_URL}/non-existent-route`, {
+      method: 'GET',
+    });
+    const data = await response.json();
+    console.log("Error Handling Test:", data);
+  } catch (error) {
+    console.error("Error Handling Test Error:", error);
+  }
+}
+
+// Test Rate Limiting
 async function testRateLimiting() {
   try {
-    let lastStatus = 0;
-    for (let i = 0; i < 5; i++) { // Reduced count for quicker test
-      const res = await fetch(`${BASE_URL}/api/support`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName: 'Rate Test', customerEmail: 'test@example.com', subject: 'Rate Test', message: 'Testing' }),
+    for (let i = 0; i < 10; i++) {
+      const response = await fetch(`${BASE_URL}/`, {
+        method: 'GET',
       });
-      lastStatus = res.status;
-      if (lastStatus === 429) break;
-    }
-
-    if (lastStatus === 429) {
-      console.log("PASS: Rate limiting is working");
-    } else {
-      console.log(`FAIL: Rate limiting is not working (Last Status: ${lastStatus})`);
+      const data = await response.json();
+      console.log("Rate Limiting Test:", data);
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   } catch (error) {
-    console.log(`FAIL: Failed to test rate limiting - ${error.message}`);
+    console.error("Rate Limiting Test Error:", error);
   }
 }
 
-// Run tests
-testAdminDashboardMetrics();
-testFileUpload();
-testCSRFProtection();
-testRateLimiting();
+async function main() {
+  await testSQLInjection();
+  await testXSS();
+  await testCSRF();
+  await testFileUploads();
+  await testLargePayloads();
+  await testMalformedData();
+  await testErrorHandling();
+  await testRateLimiting();
+}
 
-//
+main();

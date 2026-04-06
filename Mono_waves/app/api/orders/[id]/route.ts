@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { orderService } from '@/lib/services/orderService'
 import { requireAdmin } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
@@ -64,6 +65,60 @@ export async function GET(
 
     return NextResponse.json(
       { error: 'Failed to fetch order' },
+      { status: 500 }
+    )
+  }
+}
+
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Security check
+    const { isAdmin } = await requireAdmin(request)
+    if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = params
+
+    // Validate order ID
+    if (!id || typeof id !== 'string') {
+      return NextResponse.json(
+        { error: 'Valid order ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate UUID format (basic check)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: 'Invalid order ID format' },
+        { status: 400 }
+      )
+    }
+
+    // Delete order from database
+    const { error } = await supabaseAdmin
+      .from('orders')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting order:', error)
+      return NextResponse.json(
+        { error: 'Failed to delete order' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true, message: 'Order deleted successfully' })
+
+  } catch (error) {
+    console.error('Error deleting order:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete order' },
       { status: 500 }
     )
   }

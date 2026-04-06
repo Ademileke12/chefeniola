@@ -21,7 +21,7 @@ function getStripeClient(): Stripe {
   }
 
   return new Stripe(secretKey, {
-    apiVersion: '2025-02-24.acacia',
+    apiVersion: '2024-12-18.acacia',
     typescript: true,
   })
 }
@@ -92,6 +92,29 @@ export async function createCheckoutSession(
       })
     )
 
+    // Prepare metadata - strip out long fields to stay under 500 char limit
+    const cartItemsForMetadata = data.cartItems.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName.substring(0, 50), // Truncate long names
+      size: item.size,
+      color: item.color,
+      price: item.price,
+      quantity: item.quantity,
+      // Omit imageUrl - it's too long and not needed in metadata
+    }))
+
+    const shippingForMetadata = {
+      firstName: data.shippingAddress.firstName,
+      lastName: data.shippingAddress.lastName,
+      addressLine1: data.shippingAddress.addressLine1,
+      city: data.shippingAddress.city,
+      state: data.shippingAddress.state,
+      postCode: data.shippingAddress.postCode,
+      country: data.shippingAddress.country,
+      phone: data.shippingAddress.phone,
+    }
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -101,11 +124,14 @@ export async function createCheckoutSession(
       success_url: data.successUrl,
       cancel_url: data.cancelUrl,
       metadata: {
-        cartItems: JSON.stringify(data.cartItems),
-        shippingAddress: JSON.stringify(data.shippingAddress),
+        cartItems: JSON.stringify(cartItemsForMetadata),
+        shippingAddress: JSON.stringify(shippingForMetadata),
       },
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES'],
+      },
+      automatic_tax: {
+        enabled: true,
       },
     })
 
@@ -115,11 +141,21 @@ export async function createCheckoutSession(
 
     return session.url
   } catch (error) {
+    // Log the full error for debugging
+    console.error('[StripeService] Checkout session creation failed:', error)
+    
     if (error instanceof StripeServiceError) {
       throw error
     }
 
     if (error instanceof Stripe.errors.StripeError) {
+      console.error('[StripeService] Stripe API error details:', {
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+        type: error.type,
+        raw: error.raw
+      })
       throw new StripeServiceError(
         `Stripe API error: ${error.message}`,
         error.code,
@@ -182,6 +218,7 @@ export async function handlePaymentSuccess(
   stripeSessionId: string
   cartItems: CartItem[]
   shippingAddress: ShippingAddress
+  tax: number
   total: number
 }> {
   // Validate session
@@ -208,8 +245,14 @@ export async function handlePaymentSuccess(
     const cartItems: CartItem[] = JSON.parse(metadata.cartItems)
     const shippingAddress: ShippingAddress = JSON.parse(metadata.shippingAddress)
 
+    // Note: cartItems from metadata don't include imageUrl (to save space)
+    // If you need full cart data, fetch from database using session metadata
+
     // Calculate total from session amount
     const total = session.amount_total ? session.amount_total / 100 : 0
+    
+    // Extract tax amount from session
+    const tax = session.total_details?.amount_tax ? session.total_details.amount_tax / 100 : 0
 
     return {
       customerEmail: session.customer_email,
@@ -217,6 +260,7 @@ export async function handlePaymentSuccess(
       stripeSessionId: session.id,
       cartItems,
       shippingAddress,
+      tax,
       total,
     }
   } catch (error) {

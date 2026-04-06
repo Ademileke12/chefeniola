@@ -31,12 +31,18 @@ export function validateCSRF(request: NextRequest): boolean {
     const referer = request.headers.get('referer')
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-    // If both are missing, it might be a direct request (not from a browser)
-    // For browsers, at least one should be present on state-changing requests
-    if (!origin && !referer) return false
+    // For POST/PUT/DELETE requests, require origin or referer
+    const method = request.method
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        // If both are missing, reject
+        if (!origin && !referer) return false
 
-    if (origin && !origin.startsWith(appUrl)) return false
-    if (referer && !referer.startsWith(appUrl)) return false
+        // Validate origin if present
+        if (origin && !origin.startsWith(appUrl)) return false
+        
+        // Validate referer if present
+        if (referer && !referer.startsWith(appUrl)) return false
+    }
 
     return true
 }

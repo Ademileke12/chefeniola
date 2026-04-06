@@ -353,8 +353,10 @@ export function createOrderDataArbitrary(): fc.Arbitrary<any> {
   return fc.record({
     customerEmail: emailArbitrary(),
     stripePaymentId: fc.uuid().map(uuid => `pi_${uuid.replace(/-/g, '')}`),
+    stripeSessionId: fc.uuid().map(uuid => `cs_${uuid.replace(/-/g, '')}`),
     items: fc.array(orderItemArbitrary(), { minLength: 1, maxLength: 5 }),
     shippingAddress: shippingAddressArbitrary(),
+    tax: priceArbitrary(),
     total: priceArbitrary().map(p => p * 10), // Higher total for orders
   })
 }

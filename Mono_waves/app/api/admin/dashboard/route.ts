@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
-import type { DashboardResponse, DashboardMetrics, DashboardProduct, DashboardOrder, OrderStatus } from '@/types'
+import { dashboardService } from '@/lib/services/dashboardService'
+import type { DashboardResponse } from '@/types'
 
 /**
  * GET /api/admin/dashboard - Get dashboard metrics (admin)
@@ -20,94 +20,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Initialize response data with defaults
-    let metrics: DashboardMetrics = {
-      totalSales: 0,
-      totalOrders: 0,
-      totalProducts: 0,
-      totalRevenue: 0,
-    }
-    let products: DashboardProduct[] = []
-    let orders: DashboardOrder[] = []
-    const errors: string[] = []
-
-    // Performance: Fetch only necessary columns for metrics
-    const { data: metricsData, error: metricsError } = await supabaseAdmin
-      .from('orders')
-      .select('total, status')
-
-    if (metricsError) {
-      console.error('Metrics query error:', metricsError)
-      errors.push(`Failed to fetch dashboard metrics: ${metricsError.message}`)
-    } else if (metricsData) {
-      metrics.totalOrders = metricsData.length
-
-      // Calculate revenue (all non-failed orders)
-      metrics.totalRevenue = Number(metricsData
-        .filter((o: { total: number; status: string }) => o.status !== 'failed' && o.status !== 'cancelled')
-        .reduce((sum: number, o: { total: number; status: string }) => sum + Number(o.total || 0), 0)
-        .toFixed(2))
-
-      // Calculate total sales (completed orders only)
-      const completedStatuses: string[] = ['payment_confirmed', 'submitted_to_gelato', 'printing', 'shipped', 'delivered']
-      metrics.totalSales = Number(metricsData
-        .filter((o: { total: number; status: string }) => completedStatuses.includes(o.status))
-        .reduce((sum: number, o: { total: number; status: string }) => sum + Number(o.total || 0), 0)
-        .toFixed(2))
-    }
-
-    // Fetch 10 most recent orders for display
-    const { data: recentOrdersData, error: recentOrdersError } = await supabaseAdmin
-      .from('orders')
-      .select('id, order_number, customer_name, customer_email, total, status, created_at, items')
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (recentOrdersError) {
-      console.error('Recent orders query error:', recentOrdersError)
-      errors.push(`Failed to fetch recent orders: ${recentOrdersError.message}`)
-    } else if (recentOrdersData) {
-      orders = recentOrdersData
-    }
-
-    // Fetch recent published products
-    const { data: productsData, error: productsError } = await supabaseAdmin
-      .from('products')
-      .select('id, name, price, published, gelato_product_uid, created_at, images')
-      .eq('published', true)
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (productsError) {
-      console.error('Products query error:', productsError)
-      errors.push(`Failed to fetch products: ${productsError.message}`)
-    } else if (productsData) {
-      products = productsData
-    }
-
-    // Get total published products count
-    const { count: publishedProductsCount, error: productsCountError } = await supabaseAdmin
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .eq('published', true)
-
-    if (productsCountError) {
-      console.error('Products count query error:', productsCountError)
-      errors.push(`Failed to fetch products count: ${productsCountError.message}`)
-    } else {
-      metrics.totalProducts = publishedProductsCount || 0
-    }
+    // Fetch dashboard data using service layer
+    const dashboardData = await dashboardService.getDashboardData()
 
     // Prepare response
     const response: DashboardResponse = {
-      metrics,
-      products,
-      orders,
+      ...dashboardData,
       timestamp: new Date().toISOString(),
-    }
-
-    if (errors.length > 0) {
-      response.errors = errors
     }
 
     return NextResponse.json(response)

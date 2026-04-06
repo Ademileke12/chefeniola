@@ -10,7 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { stripeService } from '@/lib/services/stripeService'
-import { orderService } from '@/lib/services/orderService'
+import { orderService, calculateEstimatedDelivery } from '@/lib/services/orderService'
+import { emailService } from '@/lib/services/emailService'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import type { CreateWebhookLogData } from '@/types'
@@ -55,16 +56,23 @@ async function markWebhookProcessed(
 
 /**
  * Handle checkout.session.completed event
- * Creates order and submits to Gelato
+ * Creates order, submits to Gelato, and sends confirmation email
  * 
- * Requirements: 7.4, 8.1
+ * Requirements: 2.3, 3.1, 4.1, 4.5, 7.4, 8.1
  */
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session
 ): Promise<void> {
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@monowaves.com'
+  
   try {
     // Extract payment data
     const paymentData = await stripeService.handlePaymentSuccess(session)
+
+    // Extract tax amount from Stripe session (Requirement 4.1, 4.5)
+    const tax = session.total_details?.amount_tax 
+      ? session.total_details.amount_tax / 100 
+      : 0
 
     // Fetch product details to get gelatoProductUid and designUrl
     const orderItems = await Promise.all(
@@ -93,23 +101,96 @@ async function handleCheckoutSessionCompleted(
       })
     )
 
-    // Create order in database
+    // Create order in database with tax and session ID (Requirement 4.5)
     const order = await orderService.createOrder({
       customerEmail: paymentData.customerEmail,
       stripePaymentId: paymentData.stripePaymentId,
+      stripeSessionId: session.id,
       items: orderItems,
       shippingAddress: paymentData.shippingAddress,
+      tax,
       total: paymentData.total,
     })
 
     console.log(`Order created: ${order.orderNumber}`)
 
     // Submit order to Gelato for fulfillment
-    await orderService.submitToGelato(order.id)
+    try {
+      await orderService.submitToGelato(order.id)
+      console.log(`Order submitted to Gelato: ${order.orderNumber}`)
+    } catch (gelatoError) {
+      // Log Gelato submission failure and notify admin (Requirement 2.3)
+      logger.error('Gelato submission failed', {
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+        error: gelatoError instanceof Error ? gelatoError.message : 'Unknown error',
+      })
 
-    console.log(`Order submitted to Gelato: ${order.orderNumber}`)
+      // Send admin notification about Gelato failure
+      await emailService.sendAdminNotification({
+        to: adminEmail,
+        subject: 'Gelato Order Submission Failed',
+        message: `Failed to submit order ${order.orderNumber} to Gelato for fulfillment.`,
+        orderNumber: order.orderNumber,
+        error: gelatoError instanceof Error ? gelatoError.message : 'Unknown error',
+      })
+
+      // Re-throw to ensure webhook returns error status
+      throw gelatoError
+    }
+
+    // Send confirmation email to customer (Requirement 3.1)
+    try {
+      const estimatedDelivery = calculateEstimatedDelivery(order.createdAt)
+      
+      await emailService.sendOrderConfirmation({
+        to: order.customerEmail,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        items: order.items,
+        shippingAddress: order.shippingAddress,
+        subtotal: order.subtotal,
+        shippingCost: order.shippingCost,
+        tax: order.tax,
+        total: order.total,
+        estimatedDelivery,
+      })
+
+      console.log(`Confirmation email sent to: ${order.customerEmail}`)
+    } catch (emailError) {
+      // Log email failure but don't fail the webhook (Requirement 2.3)
+      logger.error('Failed to send confirmation email', {
+        orderNumber: order.orderNumber,
+        customerEmail: order.customerEmail,
+        error: emailError instanceof Error ? emailError.message : 'Unknown error',
+      })
+
+      // Notify admin about email failure
+      await emailService.sendAdminNotification({
+        to: adminEmail,
+        subject: 'Order Confirmation Email Failed',
+        message: `Failed to send confirmation email for order ${order.orderNumber} to ${order.customerEmail}.`,
+        orderNumber: order.orderNumber,
+        error: emailError instanceof Error ? emailError.message : 'Unknown error',
+      })
+
+      // Don't throw - email failure shouldn't fail the entire order process
+    }
   } catch (error) {
     console.error('Failed to process checkout session:', error)
+    
+    // Send admin notification for any unhandled errors (Requirement 2.3)
+    try {
+      await emailService.sendAdminNotification({
+        to: adminEmail,
+        subject: 'Order Processing Error',
+        message: 'An error occurred while processing a checkout session.',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      })
+    } catch (notificationError) {
+      console.error('Failed to send admin notification:', notificationError)
+    }
+    
     throw error
   }
 }
@@ -157,13 +238,19 @@ async function handlePaymentFailed(
  * Requirements: 7.2, 7.3, 7.4, 8.1
  */
 export async function POST(request: NextRequest) {
+  console.log('🔔 WEBHOOK RECEIVED - Stripe webhook endpoint called!')
+  console.log('Timestamp:', new Date().toISOString())
+  
   try {
     // Get raw body and signature
     const body = await request.text()
     const signature = request.headers.get('stripe-signature')
 
+    console.log('Body length:', body.length)
+    console.log('Has signature:', !!signature)
+
     if (!signature) {
-      console.error('Missing stripe-signature header')
+      console.error('❌ Missing stripe-signature header')
       return NextResponse.json(
         { error: 'Missing signature' },
         { status: 400 }

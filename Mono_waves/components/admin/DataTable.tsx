@@ -18,18 +18,18 @@ interface DataTableProps {
 export default function DataTable({ title, columns, data, className = '' }: DataTableProps) {
   return (
     <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900">{title}</h3>
       </div>
       
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[640px]">
           <thead className="bg-gray-50">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   {column.label}
                 </th>
@@ -41,7 +41,7 @@ export default function DataTable({ title, columns, data, className = '' }: Data
               <tr>
                 <td 
                   colSpan={columns.length} 
-                  className="px-6 py-8 text-center text-gray-500"
+                  className="px-4 sm:px-6 py-8 text-center text-sm text-gray-500"
                 >
                   No data available
                 </td>
@@ -50,7 +50,7 @@ export default function DataTable({ title, columns, data, className = '' }: Data
               data.map((row, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   {columns.map((column) => (
-                    <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td key={column.key} className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                       {column.render 
                         ? column.render(row[column.key], row)
                         : row[column.key]
