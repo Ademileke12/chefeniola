@@ -1,14 +1,5 @@
 'use client'
 
-/**
- * Order Confirmation Page
- * 
- * Displays order details immediately after successful payment.
- * Customers are redirected here from Stripe checkout with a session_id.
- * 
- * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
- */
-
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -16,7 +7,7 @@ import { Order } from '@/types/order'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import Button from '@/components/ui/Button'
 
-export default function OrderConfirmationPage() {
+export default function OrderConfirmationContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   
