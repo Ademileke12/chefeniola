@@ -23,7 +23,7 @@ async function checkOrderDebug() {
     console.log('❌ No webhook logs found in database')
   } else {
     console.log(`Found ${webhooks.length} webhook logs:\n`)
-    webhooks.forEach((w, i) => {
+    webhooks.forEach((w: any, i: number) => {
       console.log(`${i + 1}. Event: ${w.event_type}`)
       console.log(`   Event ID: ${w.event_id}`)
       console.log(`   Processed: ${w.processed}`)
@@ -75,7 +75,7 @@ async function checkOrderDebug() {
     console.log('❌ No orders found in database')
   } else {
     console.log(`Found ${orders.length} orders:\n`)
-    orders.forEach((o, i) => {
+    orders.forEach((o: any, i: number) => {
       console.log(`${i + 1}. Order: ${o.order_number}`)
       console.log(`   Email: ${o.customer_email}`)
       console.log(`   Status: ${o.status}`)
