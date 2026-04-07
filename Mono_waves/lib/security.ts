@@ -29,19 +29,45 @@ export function checkRateLimit(ip: string): boolean {
 export function validateCSRF(request: NextRequest): boolean {
     const origin = request.headers.get('origin')
     const referer = request.headers.get('referer')
+    const host = request.headers.get('host')
+    
+    // Get app URL and normalize it
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const appHostname = new URL(appUrl).hostname
 
-    // For POST/PUT/DELETE requests, require origin or referer
+    // For POST/PUT/DELETE requests, validate origin
     const method = request.method
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-        // If both are missing, reject
-        if (!origin && !referer) return false
-
-        // Validate origin if present
-        if (origin && !origin.startsWith(appUrl)) return false
+        // Check if origin matches
+        if (origin) {
+            try {
+                const originUrl = new URL(origin)
+                // Allow if origin hostname matches app hostname or request host
+                if (originUrl.hostname === appHostname || originUrl.hostname === host) {
+                    return true
+                }
+            } catch (e) {
+                // Invalid origin URL
+                return false
+            }
+        }
         
-        // Validate referer if present
-        if (referer && !referer.startsWith(appUrl)) return false
+        // Check if referer matches
+        if (referer) {
+            try {
+                const refererUrl = new URL(referer)
+                // Allow if referer hostname matches app hostname or request host
+                if (refererUrl.hostname === appHostname || refererUrl.hostname === host) {
+                    return true
+                }
+            } catch (e) {
+                // Invalid referer URL
+                return false
+            }
+        }
+
+        // If neither origin nor referer is present or valid, reject
+        return false
     }
 
     return true
