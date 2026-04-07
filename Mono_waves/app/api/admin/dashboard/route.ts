@@ -3,6 +3,9 @@ import { requireAdmin } from '@/lib/auth'
 import { dashboardService } from '@/lib/services/dashboardService'
 import type { DashboardResponse } from '@/types'
 
+// Force dynamic rendering - this route requires request headers for auth
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/admin/dashboard - Get dashboard metrics (admin)
  * 

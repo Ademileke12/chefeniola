@@ -4,6 +4,9 @@ import { requireAdmin } from '@/lib/auth'
 import { containsXSS, containsSQLInjection } from '@/lib/utils/validation'
 import type { OrderFilters } from '@/types/order'
 
+// Force dynamic rendering - this route uses request headers for auth
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Security check

@@ -3,6 +3,9 @@ import { fileService } from '@/lib/services/fileService'
 import { requireAdmin } from '@/lib/auth'
 import { validateCSRF } from '@/lib/security'
 
+// Force dynamic rendering - this route uses request headers for auth
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // CSRF Protection

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supportService } from '@/lib/services/supportService'
 import { requireAdmin } from '@/lib/auth'
 
+// Force dynamic rendering - this route requires request headers for auth
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/admin/support - List all support tickets (admin)
  */

@@ -3,6 +3,9 @@ import { productService } from '@/lib/services/productService'
 import { requireAdmin } from '@/lib/auth'
 import type { UpdateProductData } from '@/types'
 
+// Force dynamic rendering - this route uses request headers for auth
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/products/[id] - Get product by ID (public)
  */

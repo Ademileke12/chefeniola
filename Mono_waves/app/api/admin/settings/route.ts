@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { settingsService } from '@/lib/services/settingsService'
 import { requireAdmin } from '@/lib/auth'
 
+// Force dynamic rendering - this route requires request headers for auth
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/admin/settings - Get all store settings (admin)
  */
