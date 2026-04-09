@@ -65,9 +65,14 @@ async function handleCheckoutSessionCompleted(
 ): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@monowaves.com'
   
+  console.log('[Webhook] Processing checkout.session.completed')
+  console.log('[Webhook] Session ID:', session.id)
+  console.log('[Webhook] Customer email:', session.customer_details?.email)
+  
   try {
     // Extract payment data
     const paymentData = await stripeService.handlePaymentSuccess(session)
+    console.log('[Webhook] Payment data extracted successfully')
 
     // Extract tax amount from Stripe session (Requirement 4.1, 4.5)
     const tax = session.total_details?.amount_tax 
@@ -100,8 +105,10 @@ async function handleCheckoutSessionCompleted(
         }
       })
     )
+    console.log('[Webhook] Product details fetched for', orderItems.length, 'items')
 
     // Create order in database with tax and session ID (Requirement 4.5)
+    console.log('[Webhook] Creating order in database...')
     const order = await orderService.createOrder({
       customerEmail: paymentData.customerEmail,
       stripePaymentId: paymentData.stripePaymentId,
@@ -112,7 +119,8 @@ async function handleCheckoutSessionCompleted(
       total: paymentData.total,
     })
 
-    console.log(`Order created: ${order.orderNumber}`)
+    console.log(`[Webhook] ✅ Order created: ${order.orderNumber} (ID: ${order.id})`)
+    console.log(`[Webhook] Session ID stored: ${order.stripeSessionId}`)
 
     // Send confirmation email to customer FIRST (before Gelato submission)
     // This ensures customers get their confirmation even if Gelato fails
@@ -132,7 +140,7 @@ async function handleCheckoutSessionCompleted(
         estimatedDelivery,
       })
 
-      console.log(`Confirmation email sent to: ${order.customerEmail}`)
+      console.log(`[Webhook] ✅ Confirmation email sent to: ${order.customerEmail}`)
     } catch (emailError) {
       // Log email failure but don't fail the webhook
       logger.error('Failed to send confirmation email', {
@@ -153,8 +161,9 @@ async function handleCheckoutSessionCompleted(
 
     // Submit order to Gelato for fulfillment
     try {
+      console.log('[Webhook] Submitting order to Gelato...')
       await orderService.submitToGelato(order.id)
-      console.log(`Order submitted to Gelato: ${order.orderNumber}`)
+      console.log(`[Webhook] ✅ Order submitted to Gelato: ${order.orderNumber}`)
     } catch (gelatoError) {
       // Log Gelato submission failure and notify admin
       logger.error('Gelato submission failed', {
@@ -174,10 +183,10 @@ async function handleCheckoutSessionCompleted(
 
       // DON'T re-throw - allow order to complete even if Gelato fails
       // This is important for testing and ensures customers get their confirmation
-      console.warn(`Gelato submission failed for order ${order.orderNumber}, but order was created successfully`)
+      console.warn(`[Webhook] ⚠️  Gelato submission failed for order ${order.orderNumber}, but order was created successfully`)
     }
   } catch (error) {
-    console.error('Failed to process checkout session:', error)
+    console.error('[Webhook] ❌ Failed to process checkout session:', error)
     
     // Send admin notification for any unhandled errors (Requirement 2.3)
     try {
@@ -188,7 +197,7 @@ async function handleCheckoutSessionCompleted(
         error: error instanceof Error ? error.message : 'Unknown error',
       })
     } catch (notificationError) {
-      console.error('Failed to send admin notification:', notificationError)
+      console.error('[Webhook] Failed to send admin notification:', notificationError)
     }
     
     throw error

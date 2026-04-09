@@ -197,6 +197,8 @@ export async function getOrderBySessionId(sessionId: string): Promise<Order | nu
     throw new Error('Session ID is required')
   }
 
+  console.log('[OrderService] Querying order by session ID:', sessionId)
+
   const { data, error } = await supabaseAdmin
     .from('orders')
     .select('*')
@@ -205,9 +207,15 @@ export async function getOrderBySessionId(sessionId: string): Promise<Order | nu
 
   if (error) {
     if (error.code === 'PGRST116') {
+      console.warn('[OrderService] No order found for session ID:', sessionId)
       return null // Not found
     }
+    console.error('[OrderService] Database error:', error)
     throw new Error(`Failed to fetch order by session ID: ${error.message}`)
+  }
+
+  if (data) {
+    console.log('[OrderService] Order found:', data.order_number)
   }
 
   return data ? toOrder(data) : null

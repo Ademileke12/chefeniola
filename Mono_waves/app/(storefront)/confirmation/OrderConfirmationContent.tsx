@@ -22,22 +22,56 @@ export default function OrderConfirmationContent() {
       return
     }
 
-    // Fetch order by session ID
-    fetch(`/api/orders/session/${sessionId}`)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Order not found')
+    let attempts = 0
+    const maxAttempts = 10 // Poll for up to 30 seconds (10 attempts * 3 seconds)
+    let pollInterval: NodeJS.Timeout
+
+    // Function to fetch order
+    const fetchOrder = async () => {
+      attempts++
+      console.log(`[Confirmation] Fetching order, attempt ${attempts}/${maxAttempts}`)
+      
+      try {
+        const res = await fetch(`/api/orders/session/${sessionId}`)
+        
+        if (res.ok) {
+          const data = await res.json()
+          console.log('[Confirmation] Order found:', data.order.orderNumber)
+          setOrder(data.order)
+          setLoading(false)
+          if (pollInterval) clearInterval(pollInterval)
+          return
         }
-        return res.json()
-      })
-      .then(data => {
-        setOrder(data.order)
-        setLoading(false)
-      })
-      .catch(err => {
-        setError(err.message || 'Failed to load order')
-        setLoading(false)
-      })
+        
+        // If not found and we haven't exceeded max attempts, keep polling
+        if (attempts >= maxAttempts) {
+          console.error('[Confirmation] Max polling attempts reached')
+          setError('Order not found. Your payment was successful, but we\'re still processing your order. Please check your email for confirmation or contact support.')
+          setLoading(false)
+          if (pollInterval) clearInterval(pollInterval)
+        } else {
+          console.log(`[Confirmation] Order not found yet, will retry in 3 seconds...`)
+        }
+      } catch (err) {
+        console.error('[Confirmation] Error fetching order:', err)
+        if (attempts >= maxAttempts) {
+          setError('Failed to load order. Please check your email for confirmation or contact support.')
+          setLoading(false)
+          if (pollInterval) clearInterval(pollInterval)
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchOrder()
+
+    // Set up polling (every 3 seconds)
+    pollInterval = setInterval(fetchOrder, 3000)
+
+    // Cleanup
+    return () => {
+      if (pollInterval) clearInterval(pollInterval)
+    }
   }, [sessionId])
 
   // Calculate estimated delivery (7-10 business days)
