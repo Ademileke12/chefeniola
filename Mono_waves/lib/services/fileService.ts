@@ -69,14 +69,16 @@ export class FileService {
   /**
    * Upload a design file to Supabase Storage
    * @param file - The file to upload
+   * @param productId - Optional product ID to organize files
    * @returns Public URL of the uploaded file
    * @throws Error if validation fails or upload fails
    */
-  async uploadDesign(file: File): Promise<string> {
+  async uploadDesign(file: File, productId?: string): Promise<string> {
     console.log('Starting file upload:', {
       name: file.name,
       type: file.type,
-      size: file.size
+      size: file.size,
+      productId
     })
     
     // Validate file
@@ -91,7 +93,11 @@ export class FileService {
     const randomString = Math.random().toString(36).substring(2, 15)
     const extension = file.name.split('.').pop()
     const filename = `${timestamp}-${randomString}.${extension}`
-    const filePath = `designs/${filename}`
+    
+    // Organize by product ID if provided
+    const filePath = productId 
+      ? `designs/${productId}/${filename}`
+      : `designs/${filename}`
 
     console.log('Generated file path:', filePath)
 
@@ -104,7 +110,7 @@ export class FileService {
     console.log('Path:', filePath)
     console.log('Content-Type:', file.type)
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage with public access
     const { data, error } = await supabaseAdmin.storage
       .from(DESIGN_BUCKET)
       .upload(filePath, buffer, {
@@ -131,7 +137,28 @@ export class FileService {
     
     console.log('Public URL:', publicUrl)
     
+    // Verify URL is accessible
+    const isAccessible = await this.verifyUrlAccessible(publicUrl)
+    if (!isAccessible) {
+      console.warn('Warning: Uploaded file URL may not be publicly accessible')
+    }
+    
     return publicUrl
+  }
+
+  /**
+   * Verify that a URL is publicly accessible
+   * @param url - The URL to check
+   * @returns True if accessible, false otherwise
+   */
+  async verifyUrlAccessible(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(url, { method: 'HEAD' })
+      return response.ok
+    } catch (error) {
+      console.error('URL accessibility check failed:', error)
+      return false
+    }
   }
 
   /**

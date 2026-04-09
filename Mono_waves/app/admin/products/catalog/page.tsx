@@ -126,6 +126,37 @@ export default function ProductCatalogPage() {
     try {
       const productsToImport = products.filter(p => selectedProducts.has(p.uid))
       
+      // Validate all product UIDs first
+      const validationErrors: string[] = []
+      for (const product of productsToImport) {
+        try {
+          const validationResponse = await authenticatedFetch('/api/gelato/validate-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productUid: product.uid })
+          })
+
+          if (!validationResponse.ok) {
+            validationErrors.push(`${product.title}: Validation request failed`)
+            continue
+          }
+
+          const validationResult = await validationResponse.json()
+          if (!validationResult.valid) {
+            validationErrors.push(`${product.title}: ${validationResult.error || 'Invalid product UID'}`)
+          }
+        } catch (error) {
+          validationErrors.push(`${product.title}: Validation error`)
+        }
+      }
+
+      // If any validation errors, show them and abort
+      if (validationErrors.length > 0) {
+        alert(`Product validation failed:\n\n${validationErrors.join('\n')}\n\nPlease contact support if this issue persists.`)
+        setImporting(false)
+        return
+      }
+      
       // Import each product
       for (const product of productsToImport) {
         const productData = {

@@ -19,6 +19,14 @@ const GELATO_ORDER_API_BASE_URL = 'https://order.gelatoapis.com'
 const GELATO_PRODUCT_API_BASE_URL = 'https://product.gelatoapis.com'
 
 /**
+ * Check if TEST_MODE is enabled
+ * In TEST_MODE, Gelato API calls are simulated without real API requests
+ */
+function isTestMode(): boolean {
+  return process.env.GELATO_TEST_MODE === 'true' || process.env.NODE_ENV === 'test'
+}
+
+/**
  * Get Gelato API key from environment
  */
 function getApiKey(): string {
@@ -212,6 +220,23 @@ export async function createOrder(
     throw new Error('Shipping address is required')
   }
 
+  // TEST_MODE: Simulate successful order creation
+  if (isTestMode()) {
+    console.log('🧪 TEST_MODE: Simulating Gelato order creation')
+    console.log('Order data:', JSON.stringify(orderData, null, 2))
+    
+    const mockOrderId = `TEST-GELATO-${Date.now()}`
+    const mockResponse: GelatoOrderResponse = {
+      orderId: mockOrderId,
+      orderReferenceId: orderData.orderReferenceId,
+      status: 'created',
+      createdAt: new Date().toISOString(),
+    }
+    
+    console.log('✅ TEST_MODE: Mock order created:', mockOrderId)
+    return mockResponse
+  }
+
   try {
     const response = await gelatoFetch<GelatoOrderResponse>(
       GELATO_ORDER_API_BASE_URL,
@@ -238,6 +263,22 @@ export async function getOrderStatus(
 ): Promise<GelatoOrderStatus> {
   if (!gelatoOrderId || gelatoOrderId.trim() === '') {
     throw new Error('Gelato order ID is required')
+  }
+
+  // TEST_MODE: Simulate order status
+  if (isTestMode()) {
+    console.log('🧪 TEST_MODE: Simulating Gelato order status check')
+    
+    const mockStatus: GelatoOrderStatus = {
+      orderId: gelatoOrderId,
+      status: 'shipped',
+      trackingNumber: 'TEST-TRACK-123456789',
+      carrier: 'USPS',
+      updatedAt: new Date().toISOString(),
+    }
+    
+    console.log('✅ TEST_MODE: Mock status returned')
+    return mockStatus
   }
 
   try {

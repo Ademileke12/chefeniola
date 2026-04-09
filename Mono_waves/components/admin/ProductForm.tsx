@@ -46,12 +46,17 @@ export default function ProductForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [isValidatingUid, setIsValidatingUid] = useState(false)
+  const [uidValidationMessage, setUidValidationMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null)
 
   // Find selected Gelato product when UID changes
   useEffect(() => {
     if (formData.gelatoProductUid) {
       const gelatoProduct = gelatoProducts.find(p => p.uid === formData.gelatoProductUid)
       setSelectedGelatoProduct(gelatoProduct || null)
+
+      // Validate product UID when selected
+      validateProductUid(formData.gelatoProductUid)
 
       // Auto-populate variants from Gelato product
       if (gelatoProduct && !product) {
@@ -155,6 +160,55 @@ export default function ProductForm({
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
+    }
+  }
+
+  const validateProductUid = async (uid: string) => {
+    if (!uid) {
+      setUidValidationMessage(null)
+      return
+    }
+
+    setIsValidatingUid(true)
+    setUidValidationMessage(null)
+
+    try {
+      const response = await fetch('/api/gelato/validate-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productUid: uid })
+      })
+
+      if (!response.ok) {
+        setUidValidationMessage({
+          type: 'error',
+          message: 'Failed to validate product UID'
+        })
+        return
+      }
+
+      const result = await response.json()
+      
+      if (result.valid) {
+        setUidValidationMessage({
+          type: 'success',
+          message: 'Product UID validated successfully'
+        })
+      } else {
+        setUidValidationMessage({
+          type: 'error',
+          message: result.error || 'Invalid product UID'
+        })
+        setErrors(prev => ({ ...prev, gelatoProductUid: result.error || 'Invalid product UID' }))
+      }
+    } catch (error) {
+      console.error('UID validation error:', error)
+      setUidValidationMessage({
+        type: 'error',
+        message: 'Validation request failed'
+      })
+    } finally {
+      setIsValidatingUid(false)
     }
   }
 
@@ -298,8 +352,9 @@ export default function ProductForm({
             id="gelatoProduct"
             value={formData.gelatoProductUid}
             onChange={(e) => handleInputChange('gelatoProductUid', e.target.value)}
+            disabled={isValidatingUid}
             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${errors.gelatoProductUid ? 'border-red-300' : 'border-gray-300'
-              }`}
+              } ${isValidatingUid ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <option value="">Select a Gelato product</option>
             {gelatoProducts.map((product) => (
@@ -308,6 +363,14 @@ export default function ProductForm({
               </option>
             ))}
           </select>
+          {isValidatingUid && (
+            <p className="mt-1 text-sm text-blue-600">Validating product UID...</p>
+          )}
+          {uidValidationMessage && (
+            <p className={`mt-1 text-sm ${uidValidationMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              {uidValidationMessage.message}
+            </p>
+          )}
           {errors.gelatoProductUid && <p className="mt-1 text-sm text-red-600">{errors.gelatoProductUid}</p>}
         </div>
 

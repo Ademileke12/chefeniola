@@ -13,6 +13,7 @@
 import { supabaseAdmin } from '../supabase/server'
 import { gelatoService } from './gelatoService'
 import { logger } from '../logger'
+import { convertToISO, validateAndConvert } from '../utils/countryCodeConverter'
 import type {
   Order,
   OrderItem,
@@ -337,6 +338,96 @@ export async function updateOrderStatus(
 }
 
 /**
+ * Validation result for Gelato order submission
+ */
+interface ValidationResult {
+  isValid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
+/**
+ * Validate order before submitting to Gelato
+ * Checks all required fields and verifies data integrity
+ * 
+ * Requirements: 8.1, 8.2
+ */
+async function validateOrderForGelato(order: Order): Promise<ValidationResult> {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  // Check order has items
+  if (!order.items || order.items.length === 0) {
+    errors.push('Order has no items')
+    return { isValid: false, errors, warnings }
+  }
+
+  // Check each item
+  for (let i = 0; i < order.items.length; i++) {
+    const item = order.items[i]
+    const itemLabel = `Item ${i + 1} (${item.productName})`
+
+    // Check product UID
+    if (!item.gelatoProductUid) {
+      errors.push(`${itemLabel}: Missing Gelato product UID`)
+    }
+
+    // Check design URL
+    if (!item.designUrl) {
+      errors.push(`${itemLabel}: Missing design URL`)
+    } else if (item.designUrl === 'pending-export' || item.designUrl === 'design-editor-pending-export') {
+      errors.push(`${itemLabel}: Design not exported yet`)
+    } else {
+      // Verify URL is accessible
+      try {
+        const response = await fetch(item.designUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) })
+        if (!response.ok) {
+          errors.push(`${itemLabel}: Design URL not accessible (HTTP ${response.status})`)
+        }
+      } catch (error) {
+        errors.push(`${itemLabel}: Design URL not accessible (${error instanceof Error ? error.message : 'Network error'})`)
+      }
+    }
+
+    // Check quantity
+    if (!item.quantity || item.quantity <= 0) {
+      errors.push(`${itemLabel}: Invalid quantity`)
+    }
+  }
+
+  // Check shipping address
+  if (!order.shippingAddress) {
+    errors.push('Missing shipping address')
+    return { isValid: false, errors, warnings }
+  }
+
+  const addr = order.shippingAddress
+  if (!addr.firstName) errors.push('Shipping address: Missing first name')
+  if (!addr.lastName) errors.push('Shipping address: Missing last name')
+  if (!addr.addressLine1) errors.push('Shipping address: Missing address line 1')
+  if (!addr.city) errors.push('Shipping address: Missing city')
+  if (!addr.state) errors.push('Shipping address: Missing state')
+  if (!addr.postCode) errors.push('Shipping address: Missing postal code')
+  if (!addr.country) {
+    errors.push('Shipping address: Missing country')
+  } else {
+    // Validate country code
+    const countryValidation = validateAndConvert(addr.country)
+    if (!countryValidation.isValid) {
+      errors.push(`Shipping address: Invalid country code "${addr.country}"`)
+    } else if (countryValidation.wasConverted) {
+      warnings.push(`Country will be converted from "${addr.country}" to "${countryValidation.code}"`)
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  }
+}
+
+/**
  * Submit order to Gelato for fulfillment
  * 
  * Requirements: 8.1, 8.2, 8.3, 8.4
@@ -357,6 +448,33 @@ export async function submitToGelato(orderId: string): Promise<void> {
     throw new Error(
       `Order cannot be submitted to Gelato. Current status: ${order.status}`
     )
+  }
+
+  // Validate order data before submission
+  const validation = await validateOrderForGelato(order)
+  
+  // Log warnings
+  if (validation.warnings.length > 0) {
+    logger.info('Order validation warnings:', { orderId, warnings: validation.warnings })
+  }
+
+  // Check for errors
+  if (!validation.isValid) {
+    const errorMessage = `Order validation failed:\n${validation.errors.join('\n')}`
+    logger.error('Order validation failed', { orderId, errors: validation.errors })
+    throw new Error(errorMessage)
+  }
+
+  // Validate and convert country code
+  const countryValidation = validateAndConvert(order.shippingAddress.country)
+  if (!countryValidation.isValid) {
+    throw new Error(
+      `Invalid country code: ${order.shippingAddress.country}. Could not convert to ISO format.`
+    )
+  }
+
+  if (countryValidation.wasConverted) {
+    logger.info(`Converted country from "${order.shippingAddress.country}" to "${countryValidation.code}"`)
   }
 
   // Prepare Gelato order data
@@ -386,14 +504,19 @@ export async function submitToGelato(orderId: string): Promise<void> {
       city: order.shippingAddress.city,
       state: order.shippingAddress.state,
       postCode: order.shippingAddress.postCode,
-      country: order.shippingAddress.country,
+      country: countryValidation.code, // Use converted ISO code
       phone: order.shippingAddress.phone,
     },
   }
 
   try {
     // Submit order to Gelato
+    logger.info('Submitting order to Gelato', { orderId, orderNumber: order.orderNumber })
     const gelatoResponse = await gelatoService.createOrder(gelatoOrderData)
+    logger.info('Order submitted to Gelato successfully', { 
+      orderId, 
+      gelatoOrderId: gelatoResponse.orderId 
+    })
 
     // Update order with Gelato order ID and status
     await supabaseAdmin
@@ -405,6 +528,11 @@ export async function submitToGelato(orderId: string): Promise<void> {
       })
       .eq('id', orderId)
   } catch (error) {
+    logger.error('Failed to submit order to Gelato', { 
+      orderId, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    })
+
     // Update order status to failed
     await supabaseAdmin
       .from('orders')

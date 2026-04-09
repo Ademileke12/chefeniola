@@ -5,17 +5,7 @@ import DashboardLayout from '@/components/admin/DashboardLayout'
 import DataTable from '@/components/admin/DataTable'
 import { authenticatedFetch } from '@/lib/utils/apiClient'
 import { Eye, Download } from 'lucide-react'
-
-interface Order {
-  id: string
-  order_number: string
-  customer_name: string
-  customer_email: string
-  total: number
-  status: string
-  created_at: string
-  items: any[]
-}
+import type { Order } from '@/types/order'
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -96,13 +86,13 @@ export default function OrdersPage() {
   }
 
   const orderData = orders.map(order => ({
-    id: order.order_number,
-    customer: order.customer_name,
-    email: order.customer_email,
+    id: order.orderNumber,
+    customer: order.customerName,
+    email: order.customerEmail,
     items: Array.isArray(order.items) ? order.items.length : 1,
     total: `$${Number(order.total).toFixed(2)}`,
     status: formatOrderStatus(order.status),
-    date: new Date(order.created_at).toLocaleDateString(),
+    date: new Date(order.createdAt).toLocaleDateString(),
     rawId: order.id
   }))
 

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../supabase/server'
+import { validateProductUid } from '../utils/productUidValidator'
 import type {
   Product,
   CreateProductData,
@@ -115,6 +116,12 @@ export const productService = {
    * Create new product - Admin only
    */
   async createProduct(data: CreateProductData): Promise<Product> {
+    // Validate product UID against Gelato catalog
+    const validation = await validateProductUid(data.gelatoProductUid)
+    if (!validation.isValid) {
+      throw new Error(validation.error || 'Invalid Gelato product UID')
+    }
+
     const dbData = toDbProduct(data)
 
     const { data: created, error } = await supabaseAdmin

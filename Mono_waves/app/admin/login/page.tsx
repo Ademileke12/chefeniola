@@ -20,31 +20,34 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Use rate-limited API endpoint
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (signInError) {
-        throw signInError
-      }
+      const data = await response.json()
 
-      if (!data.user) {
-        throw new Error('No user returned from sign in')
-      }
-
-      // Check if user is admin
-      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@monowaves.com'
-      
-      if (data.user.email !== adminEmail) {
-        // Sign out non-admin user
-        await supabase.auth.signOut()
-        setError('You do not have admin privileges')
+      if (!response.ok) {
+        if (response.status === 429) {
+          // Rate limited
+          setError(data.error || 'Too many login attempts. Please try again later.')
+        } else {
+          setError(data.error || 'Failed to sign in')
+          
+          // Show remaining attempts if available
+          if (data.remaining !== undefined && data.remaining > 0) {
+            setError(`${data.error}. ${data.remaining} attempts remaining.`)
+          }
+        }
         setLoading(false)
         return
       }
 
-      // Redirect to admin dashboard
+      // Successful login - redirect to admin dashboard
       router.push('/admin')
     } catch (err) {
       console.error('Login error:', err)

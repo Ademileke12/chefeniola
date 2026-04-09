@@ -71,9 +71,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For now, allow products without designUrl if they have designData
-    // When task 14 (export) is complete, designUrl will be generated from designData
-    // This allows the design editor workflow to work before export is implemented
+    // Validate design URL or design data
+    const hasDesignUrl = body.designFileUrl && 
+                        body.designFileUrl !== 'pending-export' && 
+                        body.designFileUrl !== 'design-editor-pending-export'
+    const hasDesignData = body.designData && 
+                         body.designData.elements && 
+                         body.designData.elements.length > 0
+
+    if (!hasDesignUrl && !hasDesignData) {
+      return NextResponse.json(
+        { error: 'Either designFileUrl or designData is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate design URL is accessible if provided
+    if (hasDesignUrl) {
+      try {
+        const urlCheck = await fetch(body.designFileUrl, { method: 'HEAD' })
+        if (!urlCheck.ok) {
+          return NextResponse.json(
+            { error: 'Design file URL is not accessible' },
+            { status: 400 }
+          )
+        }
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Failed to verify design file URL accessibility' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Validate price
     if (body.price <= 0) {
