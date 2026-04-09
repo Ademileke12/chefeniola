@@ -230,7 +230,6 @@ export async function createOrder(
       orderId: mockOrderId,
       orderReferenceId: orderData.orderReferenceId,
       status: 'created',
-      createdAt: new Date().toISOString(),
     }
     
     console.log('✅ TEST_MODE: Mock order created:', mockOrderId)
@@ -274,7 +273,12 @@ export async function getOrderStatus(
       status: 'shipped',
       trackingNumber: 'TEST-TRACK-123456789',
       carrier: 'USPS',
-      updatedAt: new Date().toISOString(),
+      items: [
+        {
+          itemReferenceId: 'test-item-1',
+          status: 'shipped'
+        }
+      ]
     }
     
     console.log('✅ TEST_MODE: Mock status returned')
