@@ -1,0 +1,150 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: dishes
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required, max 100 chars)
+    //   - description: string (optional, max 500 chars)
+    //   - imageUrl: string (required, valid URL)
+    //   - createdAt: string (required, ISO 8601 date string)
+    //
+    // Collection: reviews
+    // Document ID: auto-generated
+    // Fields:
+    //   - customerName: string (required, max 100 chars)
+    //   - reviewText: string (required, max 1000 chars)
+    //   - imageUrl: string (optional, valid URL)
+    //   - createdAt: string (required, ISO 8601 date string)
+    //
+    // Collection: videos
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required, max 100 chars)
+    //   - videoUrl: string (required, valid URL)
+    //   - thumbnailUrl: string (required, valid URL)
+    //   - createdAt: string (required, ISO 8601 date string)
+    //
+    // Collection: users
+    // Document ID: user UID
+    // Fields:
+    //   - email: string (required, valid email)
+    //   - role: string (required, 'admin')
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "samuelabudud@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*")) && url.size() < 1000;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") && email.size() < 100;
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$") && dateStr.size() < 50;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidDish(data) {
+      return hasOnlyAllowedFields(['title', 'description', 'imageUrl', 'createdAt']) &&
+             hasRequiredFields(['title', 'imageUrl', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+             isValidUrl(data.imageUrl) &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidReview(data) {
+      return hasOnlyAllowedFields(['customerName', 'reviewText', 'imageUrl', 'createdAt']) &&
+             hasRequiredFields(['customerName', 'reviewText', 'createdAt']) &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 100 &&
+             data.reviewText is string && data.reviewText.size() > 0 && data.reviewText.size() <= 1000 &&
+             (!('imageUrl' in data) || isValidUrl(data.imageUrl)) &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidVideo(data) {
+      return hasOnlyAllowedFields(['title', 'videoUrl', 'thumbnailUrl', 'createdAt']) &&
+             hasRequiredFields(['title', 'videoUrl', 'thumbnailUrl', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             isValidUrl(data.videoUrl) &&
+             isValidUrl(data.thumbnailUrl) &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['email', 'role']) &&
+             hasRequiredFields(['email', 'role']) &&
+             isValidEmail(data.email) &&
+             data.role == 'admin';
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /dishes/{dishId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidDish(request.resource.data);
+      allow update: if isAdmin() && isValidDish(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidReview(request.resource.data);
+      allow update: if isAdmin() && isValidReview(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /videos/{videoId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidVideo(request.resource.data);
+      allow update: if isAdmin() && isValidVideo(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      // Only admins can read the users list
+      allow read: if isAdmin();
+      // Only admins can create or update users
+      allow create: if isAdmin() && isValidUser(request.resource.data) && request.auth.uid == userId;
+      allow update: if isAdmin() && isValidUser(request.resource.data) && request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+  }
+}

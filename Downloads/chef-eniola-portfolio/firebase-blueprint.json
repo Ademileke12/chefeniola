@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "Dish": {
+      "title": "Dish",
+      "description": "A featured dish in the gallery",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Name of the dish" },
+        "description": { "type": "string", "description": "Short description of the dish" },
+        "imageUrl": { "type": "string", "format": "uri", "description": "URL of the dish image" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "imageUrl", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A customer review",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string", "description": "Name of the customer" },
+        "reviewText": { "type": "string", "description": "Text of the review" },
+        "imageUrl": { "type": "string", "format": "uri", "description": "Optional image of the review or customer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["customerName", "reviewText", "createdAt"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "A TikTok video feature",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the video" },
+        "videoUrl": { "type": "string", "format": "uri", "description": "URL to the TikTok video" },
+        "thumbnailUrl": { "type": "string", "format": "uri", "description": "URL to the video thumbnail" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "videoUrl", "thumbnailUrl", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the admin panel",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "role": { "type": "string", "enum": ["admin"], "description": "User's role" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/dishes/{dishId}": {
+      "schema": { "$ref": "#/entities/Dish" },
+      "description": "Collection of featured dishes"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Collection of customer reviews"
+    },
+    "/videos/{videoId}": {
+      "schema": { "$ref": "#/entities/Video" },
+      "description": "Collection of featured videos"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Collection of users and their roles"
+    }
+  }
+}
