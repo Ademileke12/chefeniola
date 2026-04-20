@@ -21,7 +21,7 @@ function getStripeClient(): Stripe {
   }
 
   return new Stripe(secretKey, {
-    apiVersion: '2024-12-18.acacia' as any,
+    apiVersion: '2024-11-20.acacia',
     typescript: true,
   })
 }
