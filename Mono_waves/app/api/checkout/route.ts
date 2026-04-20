@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripeService } from '@/lib/services/stripeService'
 import { cartService } from '@/lib/services/cartService'
+import { shippingService } from '@/lib/services/shippingService'
 import { securityCheck } from '@/lib/security'
 import { logger } from '@/lib/logger'
 import { isValidEmail } from '@/lib/utils/validation'
@@ -143,6 +144,37 @@ export async function POST(request: NextRequest) {
     // Get app URL for success/cancel URLs
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
+    // Calculate shipping cost (Requirements 2.1, 2.2)
+    let shippingCost: number
+    try {
+      // Extract product UIDs from cart items for shipping calculation
+      const shippingItems = cart.items.map(item => ({
+        productUid: item.productId, // Assuming productId is the Gelato product UID
+        quantity: item.quantity
+      }))
+
+      const shippingQuote = await shippingService.getShippingCost({
+        items: shippingItems,
+        shippingAddress: {
+          country: body.shippingAddress.country,
+          state: body.shippingAddress.state,
+          postCode: body.shippingAddress.postCode
+        }
+      })
+
+      shippingCost = shippingQuote.cost
+
+      console.log('[Checkout] Shipping cost calculated:', {
+        cost: shippingCost,
+        method: shippingQuote.method,
+        estimatedDays: shippingQuote.estimatedDays
+      })
+    } catch (error) {
+      // If shipping calculation fails, use fallback
+      shippingCost = 10.00
+      console.warn('[Checkout] Failed to calculate shipping cost, using fallback:', error)
+    }
+
     // Create checkout session data
     const checkoutData = {
       cartItems: cart.items,
@@ -150,6 +182,7 @@ export async function POST(request: NextRequest) {
       shippingAddress: body.shippingAddress,
       successUrl: `${appUrl}/confirmation?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${appUrl}/cart?cancelled=true`,
+      shippingCost, // Pass shipping cost to Stripe service (Requirements 2.1, 2.2)
     }
 
     console.log('[Checkout] Creating Stripe session with data:', {

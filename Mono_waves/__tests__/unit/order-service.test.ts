@@ -59,6 +59,8 @@ describe('Order Service', () => {
     stripeSessionId: 'cs_test_123',
     items: mockOrderItems,
     shippingAddress: mockShippingAddress,
+    subtotal: 59.98,
+    shippingCost: 10.00,
     tax: 0,
     total: 69.98,
   }
@@ -219,6 +221,8 @@ describe('Order Service', () => {
         stripeSessionId: 'cs_test_123',
         items: mockOrderItems,
         shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
         tax: 0,
         total: 69.98,
       }
@@ -235,6 +239,8 @@ describe('Order Service', () => {
         stripeSessionId: '',
         items: mockOrderItems,
         shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
         tax: 0,
         total: 69.98,
       }
@@ -251,6 +257,8 @@ describe('Order Service', () => {
         stripeSessionId: 'cs_test_123',
         items: [],
         shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
         tax: 0,
         total: 69.98,
       }
@@ -258,6 +266,263 @@ describe('Order Service', () => {
       await expect(orderService.createOrder(invalidData)).rejects.toThrow(
         'Order must contain at least one item'
       )
+    })
+
+    it('should reject order with negative subtotal', async () => {
+      const invalidData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: -10.00,
+        shippingCost: 10.00,
+        tax: 0,
+        total: 0,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid subtotal is required (must be >= 0)'
+      )
+    })
+
+    it('should reject order with undefined subtotal', async () => {
+      const invalidData: any = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        shippingCost: 10.00,
+        tax: 0,
+        total: 69.98,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid subtotal is required (must be >= 0)'
+      )
+    })
+
+    it('should reject order with negative shipping cost', async () => {
+      const invalidData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: -5.00,
+        tax: 0,
+        total: 54.98,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid shipping cost is required (must be >= 0)'
+      )
+    })
+
+    it('should reject order with undefined shipping cost', async () => {
+      const invalidData: any = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        tax: 0,
+        total: 59.98,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid shipping cost is required (must be >= 0)'
+      )
+    })
+
+    it('should reject order with negative tax', async () => {
+      const invalidData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
+        tax: -2.00,
+        total: 67.98,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid tax amount is required (must be >= 0)'
+      )
+    })
+
+    it('should reject order with undefined tax', async () => {
+      const invalidData: any = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
+        total: 69.98,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid tax amount is required (must be >= 0)'
+      )
+    })
+
+    it('should reject order with zero or negative total', async () => {
+      const invalidData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 0,
+        shippingCost: 0,
+        tax: 0,
+        total: 0,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid total is required (must be > 0)'
+      )
+    })
+
+    it('should reject order with undefined total', async () => {
+      const invalidData: any = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
+        tax: 0,
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        'Valid total is required (must be > 0)'
+      )
+    })
+
+    it('should reject order when total does not match sum of components', async () => {
+      const invalidData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
+        tax: 5.00,
+        total: 100.00, // Should be 74.98
+      }
+
+      await expect(orderService.createOrder(invalidData)).rejects.toThrow(
+        /Total validation failed/
+      )
+    })
+
+    it('should accept order when total matches sum within tolerance', async () => {
+      const validData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 59.98,
+        shippingCost: 10.00,
+        tax: 5.00,
+        total: 74.98, // Exact match
+      }
+
+      const mockDbOrder = {
+        id: 'order-tolerance',
+        order_number: 'MW-TEST-TOLERANCE',
+        customer_email: 'john.doe@example.com',
+        customer_name: 'John Doe',
+        shipping_address: mockShippingAddress,
+        items: mockOrderItems,
+        subtotal: 59.98,
+        shipping_cost: 10.00,
+        tax: 5.00,
+        total: 74.98,
+        stripe_payment_id: 'pi_test_123',
+        stripe_session_id: 'cs_test_123',
+        gelato_order_id: null,
+        status: 'payment_confirmed',
+        tracking_number: null,
+        carrier: null,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      }
+
+      const mockQuery = {
+        insert: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: mockDbOrder, error: null }),
+      }
+
+      ;(supabaseAdmin.from as jest.Mock).mockReturnValue(mockQuery)
+
+      const result = await orderService.createOrder(validData)
+
+      expect(result).toBeDefined()
+      expect(result.total).toBe(74.98)
+    })
+
+    it('should accept order with zero values for subtotal, shipping, and tax', async () => {
+      const validData: CreateOrderData = {
+        customerEmail: 'john.doe@example.com',
+        stripePaymentId: 'pi_test_123',
+        stripeSessionId: 'cs_test_123',
+        items: mockOrderItems,
+        shippingAddress: mockShippingAddress,
+        subtotal: 0,
+        shippingCost: 0,
+        tax: 0,
+        total: 0.01, // Must be > 0
+      }
+
+      const mockDbOrder = {
+        id: 'order-zero',
+        order_number: 'MW-TEST-ZERO',
+        customer_email: 'john.doe@example.com',
+        customer_name: 'John Doe',
+        shipping_address: mockShippingAddress,
+        items: mockOrderItems,
+        subtotal: 0,
+        shipping_cost: 0,
+        tax: 0,
+        total: 0.01,
+        stripe_payment_id: 'pi_test_123',
+        stripe_session_id: 'cs_test_123',
+        gelato_order_id: null,
+        status: 'payment_confirmed',
+        tracking_number: null,
+        carrier: null,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      }
+
+      const mockQuery = {
+        insert: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: mockDbOrder, error: null }),
+      }
+
+      ;(supabaseAdmin.from as jest.Mock).mockReturnValue(mockQuery)
+
+      const result = await orderService.createOrder(validData)
+
+      expect(result).toBeDefined()
+      expect(result.subtotal).toBe(0)
+      expect(result.shippingCost).toBe(0)
+      expect(result.tax).toBe(0)
+      expect(result.total).toBe(0.01)
     })
   })
 

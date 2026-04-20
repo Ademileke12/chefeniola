@@ -23,13 +23,16 @@ export default function OrderConfirmationContent() {
     }
 
     let attempts = 0
-    const maxAttempts = 10 // Poll for up to 30 seconds (10 attempts * 3 seconds)
-    let pollInterval: NodeJS.Timeout
+    const maxAttempts = 10
+    // Exponential backoff delays: 500ms, 1s, 2s, 4s, then capped at 8s
+    const delays = [500, 1000, 2000, 4000, 8000, 8000, 8000, 8000, 8000, 8000]
 
-    // Function to fetch order
-    const fetchOrder = async () => {
+    // Recursive polling function with exponential backoff
+    const fetchOrder = async (): Promise<boolean> => {
       attempts++
-      console.log(`[Confirmation] Fetching order, attempt ${attempts}/${maxAttempts}`)
+      const delay = delays[attempts - 1] || 8000
+      
+      console.log(`[Confirmation] Attempt ${attempts}/${maxAttempts}, session: ${sessionId}, delay: ${delay}ms`)
       
       try {
         const res = await fetch(`/api/orders/session/${sessionId}`)
@@ -39,38 +42,48 @@ export default function OrderConfirmationContent() {
           console.log('[Confirmation] Order found:', data.order.orderNumber)
           setOrder(data.order)
           setLoading(false)
-          if (pollInterval) clearInterval(pollInterval)
-          return
+          return true // Stop polling
         }
         
-        // If not found and we haven't exceeded max attempts, keep polling
+        // Log failure with session ID and retry count
+        console.log(`[Confirmation] Order not found yet, session: ${sessionId}, attempt: ${attempts}/${maxAttempts}`)
+        
         if (attempts >= maxAttempts) {
-          console.error('[Confirmation] Max polling attempts reached')
-          setError('Order not found. Your payment was successful, but we\'re still processing your order. Please check your email for confirmation or contact support.')
+          console.error(`[Confirmation] Max polling attempts reached, session: ${sessionId}, attempts: ${attempts}`)
+          setError('Order not found. Your payment was successful, but we\'re still processing your order. Please check your email for confirmation or contact support at support@monowaves.com.')
           setLoading(false)
-          if (pollInterval) clearInterval(pollInterval)
-        } else {
-          console.log(`[Confirmation] Order not found yet, will retry in 3 seconds...`)
+          return true // Stop polling
         }
+        
+        return false // Continue polling
       } catch (err) {
-        console.error('[Confirmation] Error fetching order:', err)
+        console.error(`[Confirmation] Error fetching order, session: ${sessionId}, attempt: ${attempts}:`, err)
+        
         if (attempts >= maxAttempts) {
-          setError('Failed to load order. Please check your email for confirmation or contact support.')
+          setError('Failed to load order. Please check your email for confirmation or contact support at support@monowaves.com.')
           setLoading(false)
-          if (pollInterval) clearInterval(pollInterval)
+          return true // Stop polling
         }
+        
+        return false // Continue polling
       }
     }
 
-    // Initial fetch
-    fetchOrder()
+    // Polling function with exponential backoff
+    const poll = async () => {
+      const shouldStop = await fetchOrder()
+      if (!shouldStop && attempts < maxAttempts) {
+        const nextDelay = delays[attempts] || 8000
+        setTimeout(poll, nextDelay)
+      }
+    }
 
-    // Set up polling (every 3 seconds)
-    pollInterval = setInterval(fetchOrder, 3000)
+    // Start polling
+    poll()
 
-    // Cleanup
+    // Cleanup (no interval to clear with recursive approach)
     return () => {
-      if (pollInterval) clearInterval(pollInterval)
+      // Cleanup handled by shouldStop flag
     }
   }, [sessionId])
 

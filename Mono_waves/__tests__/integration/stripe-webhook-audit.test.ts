@@ -50,6 +50,9 @@ describe('Stripe Webhook Audit Logging', () => {
     customer_email: '[email protected]',
     payment_intent: 'pi_test_audit_123',
     amount_total: 7998,
+    total_details: {
+      amount_tax: 598, // $5.98 in cents
+    } as any,
     metadata: {
       cartItems: JSON.stringify([
         {
@@ -73,6 +76,7 @@ describe('Stripe Webhook Audit Logging', () => {
         country: 'US',
         phone: '+1-555-123-4567',
       }),
+      shippingCost: '10.00', // Add shipping cost to metadata
     },
   } as any
 
@@ -87,6 +91,7 @@ describe('Stripe Webhook Audit Logging', () => {
   // Spy references
   let verifyWebhookSignatureSpy: jest.SpiedFunction<typeof stripeService.verifyWebhookSignature>
   let handlePaymentSuccessSpy: jest.SpiedFunction<typeof stripeService.handlePaymentSuccess>
+  let getOrderBySessionIdSpy: jest.SpiedFunction<typeof orderService.getOrderBySessionId>
   let createOrderSpy: jest.SpiedFunction<typeof orderService.createOrder>
   let submitToGelatoSpy: jest.SpiedFunction<typeof orderService.submitToGelato>
   let auditLogEventSpy: jest.SpiedFunction<typeof auditService.logEvent>
@@ -94,6 +99,11 @@ describe('Stripe Webhook Audit Logging', () => {
   beforeEach(() => {
     // Create spies
     verifyWebhookSignatureSpy = jest.spyOn(stripeService, 'verifyWebhookSignature')
+    handlePaymentSuccessSpy = jest.spyOn(stripeService, 'handlePaymentSuccess')
+    getOrderBySessionIdSpy = jest.spyOn(orderService, 'getOrderBySessionId')
+    
+    // Default: no existing order found
+    getOrderBySessionIdSpy.mockResolvedValue(null)
     handlePaymentSuccessSpy = jest.spyOn(stripeService, 'handlePaymentSuccess')
     createOrderSpy = jest.spyOn(orderService, 'createOrder')
     submitToGelatoSpy = jest.spyOn(orderService, 'submitToGelato')
@@ -266,6 +276,7 @@ describe('Stripe Webhook Audit Logging', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -341,12 +352,14 @@ describe('Stripe Webhook Audit Logging', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
         id: 'order-audit-1',
         orderNumber: 'MW-AUDIT-123',
         customerEmail: '[email protected]',
+        tax: 5.98,
         total: 79.98,
         items: [{ id: 'item-1' }],
       } as any)
@@ -375,7 +388,8 @@ describe('Stripe Webhook Audit Logging', () => {
             orderId: 'order-audit-1',
             orderNumber: 'MW-AUDIT-123',
             customerEmail: '[email protected]',
-            total: 79.98,
+            tax: 5.98,
+        total: 79.98,
             itemCount: 1,
             sessionId: 'cs_test_audit_123',
           }),
@@ -419,6 +433,7 @@ describe('Stripe Webhook Audit Logging', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -490,6 +505,7 @@ describe('Stripe Webhook Audit Logging', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -589,6 +605,7 @@ describe('Stripe Webhook Audit Logging', () => {
         stripeSessionId: 'cs_test_audit_123',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       mockSingle.mockResolvedValue({
@@ -655,6 +672,7 @@ describe('Stripe Webhook Audit Logging', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({

@@ -126,7 +126,7 @@ export function calculateEstimatedDelivery(orderDate: Date | string): string {
 /**
  * Create order after successful payment
  * 
- * Requirements: 7.4
+ * Requirements: 7.4, 3.2
  */
 export async function createOrder(data: CreateOrderData): Promise<Order> {
   // Validate required fields
@@ -146,11 +146,41 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
     throw new Error('Shipping address is required')
   }
 
-  // Calculate subtotal and validate total
-  const subtotal = calculateSubtotal(data.items)
-  const shippingCost = 10.00 // Fixed shipping cost for now
-  const tax = data.tax || 0
+  // Validate cost components (Requirements: 3.2)
+  if (data.subtotal === undefined || data.subtotal === null || data.subtotal < 0) {
+    throw new Error('Valid subtotal is required (must be >= 0)')
+  }
+  if (data.shippingCost === undefined || data.shippingCost === null || data.shippingCost < 0) {
+    throw new Error('Valid shipping cost is required (must be >= 0)')
+  }
+  if (data.tax === undefined || data.tax === null || data.tax < 0) {
+    throw new Error('Valid tax amount is required (must be >= 0)')
+  }
+  if (data.total === undefined || data.total === null || data.total <= 0) {
+    throw new Error('Valid total is required (must be > 0)')
+  }
+
+  // Use provided cost components from webhook
+  const subtotal = data.subtotal
+  const shippingCost = data.shippingCost
+  const tax = data.tax
+  const total = data.total
+
+  // Validate total = subtotal + shipping + tax (Requirements: 3.3)
   const calculatedTotal = subtotal + shippingCost + tax
+  if (Math.abs(calculatedTotal - total) > 0.01) {
+    const error = `Total validation failed: ${total} != ${calculatedTotal} (subtotal: ${subtotal}, shipping: ${shippingCost}, tax: ${tax})`
+    logger.error(error, {
+      sessionId: data.stripeSessionId,
+      correlationId: data.correlationId,
+      subtotal,
+      shippingCost,
+      tax,
+      total,
+      calculatedTotal,
+    })
+    throw new Error(error)
+  }
 
   // Generate order number
   const orderNumber = generateOrderNumber()
@@ -170,7 +200,7 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
       subtotal,
       shipping_cost: shippingCost,
       tax,
-      total: data.total,
+      total,
       stripe_payment_id: data.stripePaymentId,
       stripe_session_id: data.stripeSessionId,
       correlation_id: data.correlationId,
@@ -180,7 +210,14 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
     .single()
 
   if (error) {
-    logger.error('Failed to create order', error)
+    // Log with session ID for debugging (Requirements: 3.4, 5.3)
+    logger.error('Failed to create order', {
+      error: error.message,
+      sessionId: data.stripeSessionId,
+      correlationId: data.correlationId,
+      orderNumber,
+      customerEmail: data.customerEmail,
+    })
     throw new Error(`Failed to create order: ${error.message}`)
   }
 
@@ -236,6 +273,12 @@ export async function getOrderBySessionId(sessionId: string): Promise<Order | nu
       console.warn('[OrderService] No order found for session ID:', sessionId)
       return null // Not found
     }
+    // Log database errors with session ID (Requirements: 5.3)
+    logger.error('Failed to fetch order by session ID', {
+      error: error.message,
+      sessionId,
+      errorCode: error.code,
+    })
     console.error('[OrderService] Database error:', error)
     throw new Error(`Failed to fetch order by session ID: ${error.message}`)
   }

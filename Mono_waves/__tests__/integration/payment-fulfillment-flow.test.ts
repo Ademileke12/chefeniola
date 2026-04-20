@@ -79,6 +79,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
   // Spy references
   let verifyWebhookSignatureSpy: jest.SpiedFunction<typeof stripeService.verifyWebhookSignature>
   let handlePaymentSuccessSpy: jest.SpiedFunction<typeof stripeService.handlePaymentSuccess>
+  let getOrderBySessionIdSpy: jest.SpiedFunction<typeof orderService.getOrderBySessionId>
   let createOrderSpy: jest.SpiedFunction<typeof orderService.createOrder>
   let submitToGelatoSpy: jest.SpiedFunction<typeof orderService.submitToGelato>
   let updateOrderStatusSpy: jest.SpiedFunction<typeof orderService.updateOrderStatus>
@@ -92,6 +93,9 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
     customer_email: '[email protected]',
     payment_intent: 'pi_test_flow_123',
     amount_total: 7998,
+    total_details: {
+      amount_tax: 598, // $5.98 in cents
+    } as any,
     metadata: {
       cartItems: JSON.stringify([
         {
@@ -115,6 +119,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         country: 'US',
         phone: '+1-555-123-4567',
       }),
+      shippingCost: '10.00', // Add shipping cost to metadata
     },
   } as any
 
@@ -122,11 +127,15 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
     // Create spies
     verifyWebhookSignatureSpy = jest.spyOn(stripeService, 'verifyWebhookSignature')
     handlePaymentSuccessSpy = jest.spyOn(stripeService, 'handlePaymentSuccess')
+    getOrderBySessionIdSpy = jest.spyOn(orderService, 'getOrderBySessionId')
     createOrderSpy = jest.spyOn(orderService, 'createOrder')
     submitToGelatoSpy = jest.spyOn(orderService, 'submitToGelato')
     updateOrderStatusSpy = jest.spyOn(orderService, 'updateOrderStatus')
     sendOrderConfirmationSpy = jest.spyOn(emailService, 'sendOrderConfirmation')
     sendShippingNotificationSpy = jest.spyOn(emailService, 'sendShippingNotification')
+    
+    // Default: no existing order found
+    getOrderBySessionIdSpy.mockResolvedValue(null)
 
     // Setup Supabase mock chain
     mockEq = jest.fn().mockReturnThis()
@@ -195,6 +204,8 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -285,6 +296,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         stripeSessionId: 'cs_test_email',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -370,6 +382,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         stripeSessionId: 'cs_test_fail',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -392,8 +405,8 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
       // Order should still be created even if Gelato submission fails
       expect(createOrderSpy).toHaveBeenCalled()
       expect(submitToGelatoSpy).toHaveBeenCalled()
-      // Webhook should return 500 to trigger retry
-      expect(response.status).toBe(500)
+      // Webhook should return 200 (Gelato failure doesn't fail the webhook)
+      expect(response.status).toBe(200)
     })
 
     it('should handle missing product UID validation error', async () => {
@@ -410,6 +423,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         stripeSessionId: 'cs_test_uid',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -432,7 +446,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
       const response = await stripeWebhook(request as any)
 
       expect(submitToGelatoSpy).toHaveBeenCalled()
-      expect(response.status).toBe(500)
+      expect(response.status).toBe(200)
     })
 
     it('should handle invalid design URL error', async () => {
@@ -449,6 +463,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         stripeSessionId: 'cs_test_url',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -471,7 +486,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
       const response = await stripeWebhook(request as any)
 
       expect(submitToGelatoSpy).toHaveBeenCalled()
-      expect(response.status).toBe(500)
+      expect(response.status).toBe(200)
     })
   })
 
@@ -490,6 +505,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         stripeSessionId: 'cs_test_duplicate',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       sendOrderConfirmationSpy.mockResolvedValue(undefined)
@@ -606,6 +622,7 @@ describe('Payment to Fulfillment Flow Integration Tests', () => {
         stripeSessionId: 'cs_test_email_fail',
         cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({

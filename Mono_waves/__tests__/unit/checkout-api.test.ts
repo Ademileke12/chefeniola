@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 // Mock the services before importing the route
 const mockGetCart = jest.fn()
 const mockCreateCheckoutSession = jest.fn()
+const mockGetShippingCost = jest.fn()
 
 jest.mock('@/lib/services/cartService', () => ({
   cartService: {
@@ -24,25 +25,35 @@ jest.mock('@/lib/services/stripeService', () => ({
   },
 }))
 
+jest.mock('@/lib/services/shippingService', () => ({
+  shippingService: {
+    getShippingCost: mockGetShippingCost,
+  },
+}))
+
+// Mock security check
+jest.mock('@/lib/security', () => ({
+  securityCheck: jest.fn().mockResolvedValue(null),
+}))
+
 // Mock NextRequest and NextResponse
 const mockJson = jest.fn()
 const mockRequest = {
   json: mockJson,
 } as any
 
-const mockNextResponse = {
-  json: jest.fn((data: any, options?: any) => ({
-    status: options?.status || 200,
-    json: () => Promise.resolve(data),
-  })),
-}
-
 jest.mock('next/server', () => ({
-  NextResponse: mockNextResponse,
+  NextResponse: {
+    json: jest.fn((data: any, options?: any) => ({
+      status: options?.status || 200,
+      json: async () => data,
+    })),
+  },
 }))
 
 // Import the route handler after mocking
 import { POST } from '@/app/api/checkout/route'
+import { NextResponse } from 'next/server'
 import type { Cart, CartItem, ShippingAddress } from '@/types'
 
 describe('POST /api/checkout', () => {
@@ -86,6 +97,12 @@ describe('POST /api/checkout', () => {
     // Set up default mocks
     mockGetCart.mockResolvedValue(validCart)
     mockCreateCheckoutSession.mockResolvedValue('https://checkout.stripe.com/session-123')
+    mockGetShippingCost.mockResolvedValue({
+      cost: 10.00,
+      currency: 'USD',
+      estimatedDays: 7,
+      method: 'Standard Shipping'
+    })
     mockJson.mockResolvedValue({
       sessionId: 'session-123',
       customerEmail: '[email protected]',
@@ -98,15 +115,47 @@ describe('POST /api/checkout', () => {
       const response = await POST(mockRequest)
 
       expect(mockGetCart).toHaveBeenCalledWith('session-123')
+      expect(mockGetShippingCost).toHaveBeenCalledWith({
+        items: [
+          {
+            productUid: 'prod-1',
+            quantity: 2
+          }
+        ],
+        shippingAddress: {
+          country: 'US',
+          state: 'NY',
+          postCode: '10001'
+        }
+      })
       expect(mockCreateCheckoutSession).toHaveBeenCalledWith({
         cartItems: validCartItems,
         customerEmail: '[email protected]',
         shippingAddress: validShippingAddress,
-        successUrl: expect.stringContaining('/order/confirmation'),
+        successUrl: expect.stringContaining('/confirmation'),
         cancelUrl: expect.stringContaining('/cart?cancelled=true'),
+        shippingCost: 10.00, // Shipping cost should be included
       })
-      expect(mockNextResponse.json).toHaveBeenCalledWith({
-        checkoutUrl: 'https://checkout.stripe.com/session-123',
+      expect(NextResponse.json).toHaveBeenCalledWith({
+        url: 'https://checkout.stripe.com/session-123',
+        message: 'Checkout session created successfully',
+      })
+    })
+
+    it('should use fallback shipping cost when shipping service fails', async () => {
+      mockGetShippingCost.mockRejectedValue(new Error('Shipping service unavailable'))
+
+      const response = await POST(mockRequest)
+
+      expect(mockGetCart).toHaveBeenCalledWith('session-123')
+      expect(mockGetShippingCost).toHaveBeenCalled()
+      expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shippingCost: 10.00, // Fallback shipping cost
+        })
+      )
+      expect(NextResponse.json).toHaveBeenCalledWith({
+        url: 'https://checkout.stripe.com/session-123',
         message: 'Checkout session created successfully',
       })
     })
@@ -121,7 +170,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Session ID is required' },
         { status: 400 }
       )
@@ -135,7 +184,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Customer email is required' },
         { status: 400 }
       )
@@ -149,7 +198,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Shipping address is required' },
         { status: 400 }
       )
@@ -164,7 +213,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Invalid email format' },
         { status: 400 }
       )
@@ -190,7 +239,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { 
           error: 'Invalid shipping address',
           details: {
@@ -215,7 +264,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Invalid phone number format' },
         { status: 400 }
       )
@@ -230,7 +279,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Cart is empty' },
         { status: 400 }
       )
@@ -250,7 +299,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Invalid quantity for item Test T-Shirt' },
         { status: 400 }
       )
@@ -270,7 +319,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Invalid price for item Test T-Shirt' },
         { status: 400 }
       )
@@ -283,7 +332,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Unable to retrieve cart' },
         { status: 400 }
       )
@@ -296,7 +345,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Payment service configuration error' },
         { status: 500 }
       )
@@ -309,7 +358,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Payment service error' },
         { status: 502 }
       )
@@ -322,7 +371,7 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
+      expect(NextResponse.json).toHaveBeenCalledWith(
         { error: 'Failed to create checkout session' },
         { status: 500 }
       )
@@ -372,8 +421,8 @@ describe('POST /api/checkout', () => {
 
       await POST(mockRequest)
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith({
-        checkoutUrl: 'https://checkout.stripe.com/session-123',
+      expect(NextResponse.json).toHaveBeenCalledWith({
+        url: 'https://checkout.stripe.com/session-123',
         message: 'Checkout session created successfully',
       })
     })

@@ -47,6 +47,9 @@ describe('POST /api/webhooks/stripe', () => {
     customer_email: '[email protected]',
     payment_intent: 'pi_test_123',
     amount_total: 7998,
+    total_details: {
+      amount_tax: 598, // $5.98 in cents
+    } as any,
     metadata: {
       cartItems: JSON.stringify([
         {
@@ -70,6 +73,7 @@ describe('POST /api/webhooks/stripe', () => {
         country: 'US',
         phone: '+1-555-123-4567',
       }),
+      shippingCost: '10.00', // Add shipping cost to metadata
     },
   } as any
 
@@ -84,6 +88,7 @@ describe('POST /api/webhooks/stripe', () => {
   // Spy references
   let verifyWebhookSignatureSpy: jest.SpiedFunction<typeof stripeService.verifyWebhookSignature>
   let handlePaymentSuccessSpy: jest.SpiedFunction<typeof stripeService.handlePaymentSuccess>
+  let getOrderBySessionIdSpy: jest.SpiedFunction<typeof orderService.getOrderBySessionId>
   let createOrderSpy: jest.SpiedFunction<typeof orderService.createOrder>
   let submitToGelatoSpy: jest.SpiedFunction<typeof orderService.submitToGelato>
 
@@ -91,8 +96,12 @@ describe('POST /api/webhooks/stripe', () => {
     // Create spies on the actual service methods
     verifyWebhookSignatureSpy = jest.spyOn(stripeService, 'verifyWebhookSignature')
     handlePaymentSuccessSpy = jest.spyOn(stripeService, 'handlePaymentSuccess')
+    getOrderBySessionIdSpy = jest.spyOn(orderService, 'getOrderBySessionId')
     createOrderSpy = jest.spyOn(orderService, 'createOrder')
     submitToGelatoSpy = jest.spyOn(orderService, 'submitToGelato')
+    
+    // Default: no existing order found
+    getOrderBySessionIdSpy.mockResolvedValue(null)
 
     // Setup default Supabase mock chain
     mockEq = jest.fn().mockReturnThis()
@@ -238,6 +247,7 @@ describe('POST /api/webhooks/stripe', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -263,7 +273,7 @@ describe('POST /api/webhooks/stripe', () => {
       expect(response.status).toBe(200)
       expect(data.received).toBe(true)
       expect(createOrderSpy).toHaveBeenCalled()
-      expect(submitToGelatoSpy).toHaveBeenCalledWith('order-1')
+      expect(submitToGelatoSpy).toHaveBeenCalledWith('order-1', expect.any(String))
     })
 
     it('should return 500 when order creation fails', async () => {
@@ -278,8 +288,9 @@ describe('POST /api/webhooks/stripe', () => {
         customerEmail: '[email protected]',
         stripePaymentId: 'pi_test_123',
         stripeSessionId: 'cs_test_123',
-        cartItems: [{ id: 'item-1', productId: 'prod-1' } as any],
+        cartItems: [{ id: 'item-1', productId: 'prod-1', price: 29.99, quantity: 2 } as any],
         shippingAddress: {} as any,
+        tax: 5.98,
         total: 79.98,
       })
       mockSingle.mockResolvedValue({
@@ -356,6 +367,7 @@ describe('POST /api/webhooks/stripe', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
       createOrderSpy.mockResolvedValue({
@@ -431,6 +443,7 @@ describe('POST /api/webhooks/stripe', () => {
           country: 'US',
           phone: '+1-555-123-4567',
         },
+        tax: 5.98,
         total: 79.98,
       })
 

@@ -14,6 +14,7 @@ import type { Cart, CartItem, ShippingAddress } from '@/types'
 // Mock the services
 const mockGetCart = jest.fn()
 const mockCreateCheckoutSession = jest.fn()
+const mockGetShippingCost = jest.fn()
 
 jest.mock('@/lib/services/cartService', () => ({
   cartService: {
@@ -24,6 +25,12 @@ jest.mock('@/lib/services/cartService', () => ({
 jest.mock('@/lib/services/stripeService', () => ({
   stripeService: {
     createCheckoutSession: mockCreateCheckoutSession,
+  },
+}))
+
+jest.mock('@/lib/services/shippingService', () => ({
+  shippingService: {
+    getShippingCost: mockGetShippingCost,
   },
 }))
 
@@ -68,6 +75,12 @@ describe('POST /api/checkout', () => {
     // Set up default mocks
     mockGetCart.mockResolvedValue(validCart)
     mockCreateCheckoutSession.mockResolvedValue('https://checkout.stripe.com/session-123')
+    mockGetShippingCost.mockResolvedValue({
+      cost: 10.00,
+      currency: 'USD',
+      estimatedDays: 7,
+      method: 'Standard Shipping'
+    })
   })
 
   describe('Successful checkout session creation', () => {
@@ -90,18 +103,63 @@ describe('POST /api/checkout', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.checkoutUrl).toBe('https://checkout.stripe.com/session-123')
+      expect(data.url).toBe('https://checkout.stripe.com/session-123')
       expect(data.message).toBe('Checkout session created successfully')
 
       // Verify service calls
       expect(mockGetCart).toHaveBeenCalledWith('session-123')
+      expect(mockGetShippingCost).toHaveBeenCalledWith({
+        items: [
+          {
+            productUid: 'prod-1',
+            quantity: 2
+          }
+        ],
+        shippingAddress: {
+          country: 'US',
+          state: 'NY',
+          postCode: '10001'
+        }
+      })
       expect(mockCreateCheckoutSession).toHaveBeenCalledWith({
         cartItems: validCartItems,
         customerEmail: '[email protected]',
         shippingAddress: validShippingAddress,
-        successUrl: expect.stringContaining('/order/confirmation'),
+        successUrl: expect.stringContaining('/confirmation'),
         cancelUrl: expect.stringContaining('/cart?cancelled=true'),
+        shippingCost: 10.00, // Shipping cost should be included
       })
+    })
+
+    it('should use fallback shipping cost when shipping service fails', async () => {
+      mockGetShippingCost.mockRejectedValue(new Error('Shipping service unavailable'))
+
+      const requestBody = {
+        sessionId: 'session-123',
+        customerEmail: '[email protected]',
+        shippingAddress: validShippingAddress,
+      }
+
+      const request = new NextRequest('http://localhost:3000/api/checkout', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.url).toBe('https://checkout.stripe.com/session-123')
+
+      // Verify fallback shipping cost is used
+      expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shippingCost: 10.00, // Fallback shipping cost
+        })
+      )
     })
   })
 
@@ -450,6 +508,7 @@ describe('POST /api/checkout', () => {
       expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
         expect.objectContaining({
           cartItems: multipleItemsCart.items,
+          shippingCost: 10.00, // Shipping cost should be included
         })
       )
     })
@@ -475,7 +534,7 @@ describe('POST /api/checkout', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.checkoutUrl).toBeDefined()
+      expect(data.url).toBeDefined()
     })
   })
 })

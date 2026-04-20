@@ -94,10 +94,57 @@ async function handleCheckoutSessionCompleted(
       },
     })
 
-    // Extract tax amount from Stripe session (Requirement 4.1, 4.5)
+    // Subtask 4.1: Extract shipping cost from session metadata (Requirement 3.1)
+    const shippingCost = session.metadata?.shippingCost 
+      ? parseFloat(session.metadata.shippingCost) 
+      : 10.00 // Fallback to default
+    
+    console.log('[Webhook] Shipping cost extracted:', shippingCost, 'from session:', session.id)
+
+    // Subtask 4.2: Extract tax from Stripe automatic tax calculation (Requirement 2.4)
     const tax = session.total_details?.amount_tax 
       ? session.total_details.amount_tax / 100 
       : 0
+    
+    console.log('[Webhook] Tax extracted:', tax)
+
+    // Subtask 4.3: Calculate and validate total (Requirements 2.2, 3.3)
+    const subtotal = paymentData.cartItems.reduce(
+      (sum, item) => sum + item.price * item.quantity, 
+      0
+    )
+    const calculatedTotal = subtotal + shippingCost + tax
+    const stripeTotal = session.amount_total ? session.amount_total / 100 : 0
+    
+    // Log all cost components (Subtask 4.5, Requirement 5.2)
+    console.log('[Webhook] Cost components:', {
+      sessionId: session.id,
+      correlationId,
+      subtotal,
+      shippingCost,
+      tax,
+      calculatedTotal,
+      stripeTotal,
+    })
+    
+    // Validate total matches Stripe's amount (within 1 cent tolerance)
+    if (Math.abs(calculatedTotal - stripeTotal) > 0.01) {
+      logger.error('Total mismatch detected', {
+        sessionId: session.id,
+        correlationId,
+        calculated: calculatedTotal,
+        stripe: stripeTotal,
+        difference: Math.abs(calculatedTotal - stripeTotal),
+        subtotal,
+        shippingCost,
+        tax,
+      })
+      console.warn('[Webhook] ⚠️  Total mismatch:', {
+        calculated: calculatedTotal,
+        stripe: stripeTotal,
+        difference: Math.abs(calculatedTotal - stripeTotal),
+      })
+    }
 
     // Check for existing order by session ID (idempotency)
     console.log('[Webhook] Checking for existing order...')
@@ -154,15 +201,19 @@ async function handleCheckoutSessionCompleted(
 
     // Create order in database with tax, session ID, and correlation ID (Requirement 4.5)
     console.log('[Webhook] Creating order in database...')
+    
+    // Subtask 4.4: Update order creation call with all cost components (Requirements 2.4, 3.2, 3.5)
     const order = await orderService.createOrder({
       customerEmail: paymentData.customerEmail,
       stripePaymentId: paymentData.stripePaymentId,
-      stripeSessionId: session.id,
+      stripeSessionId: session.id, // Pass stripeSessionId for indexed lookup
       items: orderItems,
       shippingAddress: paymentData.shippingAddress,
-      tax,
-      total: paymentData.total,
-      correlationId,
+      subtotal, // Pass subtotal
+      shippingCost, // Pass shippingCost
+      tax, // Pass tax
+      total: stripeTotal, // Use Stripe's total as source of truth
+      correlationId, // Pass correlationId for request tracing
     })
 
     console.log(`[Webhook] ✅ Order created: ${order.orderNumber} (ID: ${order.id})`)

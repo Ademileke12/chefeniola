@@ -60,6 +60,8 @@ export interface CreateOrderData {
   stripeSessionId: string
   items: OrderItem[]
   shippingAddress: ShippingAddress
+  subtotal: number
+  shippingCost: number
   tax: number
   total: number
   correlationId?: string

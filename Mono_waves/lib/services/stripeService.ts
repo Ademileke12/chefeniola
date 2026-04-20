@@ -54,7 +54,7 @@ export class StripeServiceError extends Error {
 /**
  * Create a Stripe checkout session
  * 
- * Requirements: 6.4, 7.1
+ * Requirements: 6.4, 7.1, 2.1, 2.3, 2.5
  */
 export async function createCheckoutSession(
   data: CheckoutSessionData
@@ -71,6 +71,17 @@ export async function createCheckoutSession(
   }
   if (!data.successUrl || !data.cancelUrl) {
     throw new StripeServiceError('Success and cancel URLs are required', 'INVALID_INPUT')
+  }
+  
+  // Validate shipping cost (Requirement 2.5)
+  if (data.shippingCost === undefined || data.shippingCost === null) {
+    throw new StripeServiceError('Shipping cost is required', 'INVALID_INPUT')
+  }
+  if (typeof data.shippingCost !== 'number' || isNaN(data.shippingCost) || !isFinite(data.shippingCost)) {
+    throw new StripeServiceError('Shipping cost must be a valid number', 'INVALID_INPUT')
+  }
+  if (data.shippingCost < 0) {
+    throw new StripeServiceError('Shipping cost cannot be negative', 'INVALID_INPUT')
   }
 
   const stripe = getStripeClient()
@@ -91,6 +102,22 @@ export async function createCheckoutSession(
         quantity: item.quantity,
       })
     )
+
+    // Add shipping as a line item (Requirement 2.1)
+    const shippingLineItem = {
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: 'Shipping',
+          description: 'Standard shipping (7-10 business days)',
+        },
+        unit_amount: Math.round(data.shippingCost * 100), // Convert to cents
+      },
+      quantity: 1,
+    }
+
+    // Combine product line items with shipping line item
+    const allLineItems = [...lineItems, shippingLineItem]
 
     // Prepare metadata - strip out long fields to stay under 500 char limit
     const cartItemsForMetadata = data.cartItems.map(item => ({
@@ -119,13 +146,14 @@ export async function createCheckoutSession(
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
-      line_items: lineItems,
+      line_items: allLineItems,
       customer_email: data.customerEmail,
       success_url: data.successUrl,
       cancel_url: data.cancelUrl,
       metadata: {
         cartItems: JSON.stringify(cartItemsForMetadata),
         shippingAddress: JSON.stringify(shippingForMetadata),
+        shippingCost: data.shippingCost.toFixed(2), // Include shipping cost in metadata (Requirement 2.3)
       },
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES'],

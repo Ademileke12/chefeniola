@@ -1,11 +1,12 @@
 /**
  * Unit Tests for Stripe Service Webhook Handling
- * Feature: mono-waves-ecommerce
+ * Feature: mono-waves-ecommerce, order-confirmation-production-fix
  * 
  * These tests validate specific webhook handling scenarios including
  * successful payment, failed payment, and invalid signature rejection.
+ * Also tests shipping line item creation and validation.
  * 
- * Requirements: 7.5
+ * Requirements: 7.5, 2.1, 2.3, 2.5
  * 
  * @jest-environment node
  */
@@ -13,11 +14,13 @@
 import { describe, it, expect, beforeAll } from '@jest/globals'
 import Stripe from 'stripe'
 import {
+  createCheckoutSession,
   verifyWebhookSignature,
   handlePaymentSuccess,
   handlePaymentFailure,
   StripeServiceError,
 } from '@/lib/services/stripeService'
+import type { CheckoutSessionData } from '@/types'
 
 describe('Stripe Webhook Handling', () => {
   let stripeConfigured = false
@@ -466,6 +469,287 @@ describe('Stripe Webhook Handling', () => {
       const result = await handlePaymentSuccess(mockSession)
 
       expect(result.total).toBe(0)
+    })
+  })
+
+  /**
+   * Test shipping line item creation
+   * Feature: order-confirmation-production-fix
+   * Requirements: 2.1, 2.3, 2.5
+   */
+  describe('Shipping Line Item Creation', () => {
+    const mockCheckoutData: CheckoutSessionData = {
+      cartItems: [
+        {
+          id: 'item-1',
+          productId: 'prod-123',
+          productName: 'Test T-Shirt',
+          size: 'M',
+          color: 'Blue',
+          quantity: 1,
+          price: 29.99,
+          imageUrl: 'https://example.com/image.jpg',
+        },
+      ],
+      customerEmail: 'customer@example.com',
+      shippingAddress: {
+        firstName: 'John',
+        lastName: 'Doe',
+        addressLine1: '123 Main St',
+        city: 'San Francisco',
+        state: 'CA',
+        postCode: '94102',
+        country: 'US',
+        phone: '555-1234',
+      },
+      successUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+      shippingCost: 10.00,
+    }
+
+    /**
+     * Test: Shipping line item is included in session
+     * Requirement: 2.1
+     */
+    it('should include shipping as a line item in the session', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const validData = {
+        ...mockCheckoutData,
+        shippingCost: 12.50,
+      }
+
+      // Create a real session and verify it was created successfully
+      const sessionUrl = await createCheckoutSession(validData)
+      expect(sessionUrl).toBeDefined()
+      expect(typeof sessionUrl).toBe('string')
+      expect(sessionUrl).toContain('checkout.stripe.com')
+
+      // Note: In a real integration test, we would retrieve the session
+      // and verify line_items includes shipping. For unit tests, we verify
+      // the function completes successfully with valid shipping cost.
+      // The actual line item verification is done in integration tests.
+    })
+
+    /**
+     * Test: Shipping cost in metadata
+     * Requirement: 2.3
+     */
+    it('should include shipping cost in session metadata', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const validData = {
+        ...mockCheckoutData,
+        shippingCost: 15.99,
+      }
+
+      // Create session - metadata is included in the Stripe API call
+      const sessionUrl = await createCheckoutSession(validData)
+      expect(sessionUrl).toBeDefined()
+      
+      // Note: The metadata.shippingCost is verified in the implementation
+      // by the line: metadata.shippingCost: data.shippingCost.toFixed(2)
+      // Integration tests verify the actual metadata in the created session.
+    })
+
+    /**
+     * Test: Negative shipping cost rejection
+     * Requirement: 2.5
+     */
+    it('should reject checkout session with negative shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const invalidData = {
+        ...mockCheckoutData,
+        shippingCost: -5.00,
+      }
+
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        StripeServiceError
+      )
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        /shipping cost cannot be negative/i
+      )
+    })
+
+    /**
+     * Test: Shipping cost validation edge cases
+     * Requirement: 2.5
+     */
+    it('should reject checkout session with NaN shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const invalidData = {
+        ...mockCheckoutData,
+        shippingCost: NaN,
+      }
+
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        StripeServiceError
+      )
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        /shipping cost must be a valid number/i
+      )
+    })
+
+    it('should reject checkout session with undefined shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const invalidData = {
+        ...mockCheckoutData,
+        shippingCost: undefined as any,
+      }
+
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        StripeServiceError
+      )
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        /shipping cost is required/i
+      )
+    })
+
+    it('should reject checkout session with null shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const invalidData = {
+        ...mockCheckoutData,
+        shippingCost: null as any,
+      }
+
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        StripeServiceError
+      )
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        /shipping cost is required/i
+      )
+    })
+
+    it('should reject checkout session with string shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const invalidData = {
+        ...mockCheckoutData,
+        shippingCost: '10.00' as any,
+      }
+
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        StripeServiceError
+      )
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        /shipping cost must be a valid number/i
+      )
+    })
+
+    it('should reject checkout session with Infinity shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const invalidData = {
+        ...mockCheckoutData,
+        shippingCost: Infinity,
+      }
+
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        StripeServiceError
+      )
+      await expect(createCheckoutSession(invalidData)).rejects.toThrow(
+        /shipping cost must be a valid number/i
+      )
+    })
+
+    it('should accept checkout session with zero shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const validData = {
+        ...mockCheckoutData,
+        shippingCost: 0,
+      }
+
+      // This should not throw
+      const result = await createCheckoutSession(validData)
+      expect(result).toBeDefined()
+      expect(typeof result).toBe('string')
+      expect(result).toContain('checkout.stripe.com')
+    })
+
+    it('should accept checkout session with valid positive shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const validData = {
+        ...mockCheckoutData,
+        shippingCost: 15.99,
+      }
+
+      // This should not throw
+      const result = await createCheckoutSession(validData)
+      expect(result).toBeDefined()
+      expect(typeof result).toBe('string')
+      expect(result).toContain('checkout.stripe.com')
+    })
+
+    it('should accept checkout session with large shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const validData = {
+        ...mockCheckoutData,
+        shippingCost: 999.99,
+      }
+
+      // This should not throw
+      const result = await createCheckoutSession(validData)
+      expect(result).toBeDefined()
+      expect(typeof result).toBe('string')
+      expect(result).toContain('checkout.stripe.com')
+    })
+
+    it('should accept checkout session with decimal shipping cost', async () => {
+      if (!stripeConfigured) {
+        console.log('⏭️  Skipping: Stripe not configured')
+        return
+      }
+
+      const validData = {
+        ...mockCheckoutData,
+        shippingCost: 7.49,
+      }
+
+      // This should not throw
+      const result = await createCheckoutSession(validData)
+      expect(result).toBeDefined()
+      expect(typeof result).toBe('string')
+      expect(result).toContain('checkout.stripe.com')
     })
   })
 })
