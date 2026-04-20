@@ -12,8 +12,11 @@
 
 import { supabaseAdmin } from '../supabase/server'
 import { gelatoService } from './gelatoService'
+import { emailService } from './emailService'
+import { auditService } from './auditService'
 import { logger } from '../logger'
 import { convertToISO, validateAndConvert } from '../utils/countryCodeConverter'
+import { CircuitBreaker } from '../utils/circuitBreaker'
 import type {
   Order,
   OrderItem,
@@ -25,6 +28,27 @@ import type {
 } from '@/types/order'
 import type { DatabaseOrder } from '@/types/database'
 import type { GelatoOrderData, GelatoOrderItem } from '@/types/gelato'
+
+// Initialize circuit breaker for Gelato API
+const gelatoCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeout: 60000, // 1 minute
+})
+
+/**
+ * Retry configuration for Gelato submissions
+ */
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  delays: [1000, 2000, 4000], // Exponential backoff: 1s, 2s, 4s
+}
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 /**
  * Convert database order to application order
@@ -47,6 +71,7 @@ function toOrder(dbOrder: DatabaseOrder): Order {
     status: dbOrder.status as OrderStatus,
     trackingNumber: dbOrder.tracking_number || undefined,
     carrier: dbOrder.carrier || undefined,
+    correlationId: dbOrder.correlation_id || undefined,
     createdAt: dbOrder.created_at,
     updatedAt: dbOrder.updated_at,
   }
@@ -148,6 +173,7 @@ export async function createOrder(data: CreateOrderData): Promise<Order> {
       total: data.total,
       stripe_payment_id: data.stripePaymentId,
       stripe_session_id: data.stripeSessionId,
+      correlation_id: data.correlationId,
       status: 'payment_confirmed',
     })
     .select()
@@ -436,11 +462,11 @@ async function validateOrderForGelato(order: Order): Promise<ValidationResult> {
 }
 
 /**
- * Submit order to Gelato for fulfillment
+ * Submit order to Gelato for fulfillment with retry logic and circuit breaker
  * 
- * Requirements: 8.1, 8.2, 8.3, 8.4
+ * Requirements: 8.1, 8.2, 8.3, 8.4, 2.3
  */
-export async function submitToGelato(orderId: string): Promise<void> {
+export async function submitToGelato(orderId: string, correlationId?: string): Promise<void> {
   if (!orderId) {
     throw new Error('Order ID is required')
   }
@@ -451,8 +477,23 @@ export async function submitToGelato(orderId: string): Promise<void> {
     throw new Error(`Order not found: ${orderId}`)
   }
 
+  // Log with correlation ID if provided
+  if (correlationId) {
+    console.log(`[OrderService] Submitting to Gelato with correlation ID: ${correlationId}`)
+  }
+
+  // Check if already submitted to prevent duplicates
+  if (order.gelatoOrderId) {
+    logger.info('Order already submitted to Gelato', { 
+      orderId, 
+      gelatoOrderId: order.gelatoOrderId,
+      correlationId 
+    })
+    return
+  }
+
   // Validate order status
-  if (order.status !== 'payment_confirmed') {
+  if (order.status !== 'payment_confirmed' && order.status !== 'failed') {
     throw new Error(
       `Order cannot be submitted to Gelato. Current status: ${order.status}`
     )
@@ -470,6 +511,20 @@ export async function submitToGelato(orderId: string): Promise<void> {
   if (!validation.isValid) {
     const errorMessage = `Order validation failed:\n${validation.errors.join('\n')}`
     logger.error('Order validation failed', { orderId, errors: validation.errors })
+    
+    // Log to audit service
+    await auditService.logEvent({
+      eventType: 'order.gelato_submission_failed',
+      severity: 'error',
+      source: 'system',
+      correlationId: correlationId || orderId,
+      metadata: {
+        orderId,
+        orderNumber: order.orderNumber,
+        errors: validation.errors,
+      },
+    })
+    
     throw new Error(errorMessage)
   }
 
@@ -517,43 +572,158 @@ export async function submitToGelato(orderId: string): Promise<void> {
     },
   }
 
-  try {
-    // Submit order to Gelato
-    logger.info('Submitting order to Gelato', { orderId, orderNumber: order.orderNumber })
-    const gelatoResponse = await gelatoService.createOrder(gelatoOrderData)
-    logger.info('Order submitted to Gelato successfully', { 
-      orderId, 
-      gelatoOrderId: gelatoResponse.orderId 
-    })
+  // Get current retry count
+  const currentRetryCount = order.retryCount || 0
 
-    // Update order with Gelato order ID and status
-    await supabaseAdmin
-      .from('orders')
-      .update({
-        gelato_order_id: gelatoResponse.orderId,
-        status: 'submitted_to_gelato',
-        updated_at: new Date().toISOString(),
+  // Retry logic with exponential backoff
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      // Log retry attempt
+      if (attempt > 0) {
+        logger.info(`Retry attempt ${attempt} for Gelato submission`, { 
+          orderId, 
+          orderNumber: order.orderNumber,
+          correlationId 
+        })
+        
+        await auditService.logEvent({
+          eventType: 'order.submitted_to_gelato',
+          severity: 'info',
+          source: 'gelato',
+          correlationId: correlationId || orderId,
+          metadata: {
+            orderId,
+            orderNumber: order.orderNumber,
+            attempt,
+            totalRetries: currentRetryCount + attempt,
+          },
+        })
+      }
+
+      // Submit order to Gelato through circuit breaker
+      logger.info('Submitting order to Gelato', { 
+        orderId, 
+        orderNumber: order.orderNumber,
+        attempt,
+        correlationId 
       })
-      .eq('id', orderId)
-  } catch (error) {
-    logger.error('Failed to submit order to Gelato', { 
-      orderId, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    })
-
-    // Update order status to failed
-    await supabaseAdmin
-      .from('orders')
-      .update({
-        status: 'failed',
-        updated_at: new Date().toISOString(),
+      
+      const gelatoResponse = await gelatoCircuitBreaker.execute(async () => {
+        return await gelatoService.createOrder(gelatoOrderData)
       })
-      .eq('id', orderId)
+      
+      logger.info('Order submitted to Gelato successfully', { 
+        orderId, 
+        gelatoOrderId: gelatoResponse.orderId,
+        attempt,
+        correlationId 
+      })
 
-    throw new Error(
-      `Failed to submit order to Gelato: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+      // Update order with Gelato order ID and status
+      await supabaseAdmin
+        .from('orders')
+        .update({
+          gelato_order_id: gelatoResponse.orderId,
+          status: 'submitted_to_gelato',
+          retry_count: currentRetryCount + attempt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId)
+
+      // Log successful submission to audit service
+      await auditService.logEvent({
+        eventType: 'order.submitted_to_gelato',
+        severity: 'info',
+        source: 'gelato',
+        correlationId: correlationId || orderId,
+        metadata: {
+          orderId,
+          orderNumber: order.orderNumber,
+          gelatoOrderId: gelatoResponse.orderId,
+          attempt,
+          totalRetries: currentRetryCount + attempt,
+        },
+      })
+
+      // Success - exit retry loop
+      return
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error')
+      
+      logger.error(`Gelato submission attempt ${attempt + 1} failed`, { 
+        orderId,
+        orderNumber: order.orderNumber,
+        correlationId,
+        error: lastError.message,
+        attempt: attempt + 1,
+        maxRetries: RETRY_CONFIG.maxRetries + 1,
+      })
+
+      // Log failure to audit service
+      await auditService.logEvent({
+        eventType: 'order.gelato_submission_failed',
+        severity: attempt >= RETRY_CONFIG.maxRetries ? 'error' : 'warning',
+        source: 'gelato',
+        correlationId: correlationId || orderId,
+        metadata: {
+          orderId,
+          orderNumber: order.orderNumber,
+          error: lastError.message,
+          attempt: attempt + 1,
+          willRetry: attempt < RETRY_CONFIG.maxRetries,
+        },
+      })
+
+      // If this was the last attempt, update order status and throw
+      if (attempt >= RETRY_CONFIG.maxRetries) {
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'failed',
+            retry_count: currentRetryCount + attempt + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId)
+
+        // Send admin notification
+        try {
+          await emailService.sendAdminNotification({
+            to: process.env.ADMIN_EMAIL || '[email protected]',
+            subject: `Gelato Submission Failed: ${order.orderNumber}`,
+            message: `Order ${order.orderNumber} failed to submit to Gelato after ${RETRY_CONFIG.maxRetries + 1} attempts.\n\nError: ${lastError.message}`,
+            orderNumber: order.orderNumber,
+            error: lastError.message,
+          })
+        } catch (emailError) {
+          logger.error('Failed to send admin notification', { orderId, error: emailError })
+        }
+
+        throw new Error(
+          `Failed to submit order to Gelato after ${RETRY_CONFIG.maxRetries + 1} attempts: ${lastError.message}`
+        )
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = RETRY_CONFIG.delays[attempt]
+      logger.info(`Waiting ${delay}ms before retry`, { orderId, attempt: attempt + 1 })
+      await sleep(delay)
+      
+      // Update retry count in database
+      await supabaseAdmin
+        .from('orders')
+        .update({
+          retry_count: currentRetryCount + attempt + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId)
+    }
   }
+
+  // This should never be reached, but just in case
+  throw lastError || new Error('Failed to submit order to Gelato')
 }
 
 /**

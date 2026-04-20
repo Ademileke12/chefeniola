@@ -15,6 +15,8 @@ export interface Order {
   status: OrderStatus
   trackingNumber?: string
   carrier?: string
+  correlationId?: string
+  retryCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -60,6 +62,7 @@ export interface CreateOrderData {
   shippingAddress: ShippingAddress
   tax: number
   total: number
+  correlationId?: string
 }
 
 export interface OrderFilters {

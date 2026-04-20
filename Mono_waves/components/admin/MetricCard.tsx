@@ -10,7 +10,7 @@ interface MetricCardProps {
     value: number
     direction: 'up' | 'down'
   }
-  variant?: 'default' | 'dark'
+  variant?: 'default' | 'dark' | 'warning'
   className?: string
 }
 
@@ -23,22 +23,25 @@ export default function MetricCard({
   className = '' 
 }: MetricCardProps) {
   const isDark = variant === 'dark'
+  const isWarning = variant === 'warning'
   
   return (
     <div className={`
       p-4 sm:p-6 rounded-lg border
       ${isDark 
         ? 'bg-gray-900 border-gray-800 text-white' 
+        : isWarning
+        ? 'bg-yellow-50 border-yellow-200'
         : 'bg-white border-gray-200'
       }
       ${className}
     `}>
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <p className={`text-xs sm:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'} truncate`}>
+          <p className={`text-xs sm:text-sm font-medium ${isDark ? 'text-gray-300' : isWarning ? 'text-yellow-700' : 'text-gray-600'} truncate`}>
             {title}
           </p>
-          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDark ? 'text-white' : isWarning ? 'text-yellow-900' : 'text-gray-900'}`}>
             {value}
           </p>
           {trend && (
@@ -54,7 +57,7 @@ export default function MetricCard({
           )}
         </div>
         {icon && (
-          <div className={`ml-3 sm:ml-4 flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <div className={`ml-3 sm:ml-4 flex-shrink-0 ${isDark ? 'text-gray-400' : isWarning ? 'text-yellow-600' : 'text-gray-500'}`}>
             {icon}
           </div>
         )}

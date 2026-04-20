@@ -56,13 +56,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Attempt login with Supabase
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    // Attempt login with Supabase with retry logic
+    let data
+    let signInError
+    let retries = 3
+    
+    while (retries > 0) {
+      try {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        data = result.data
+        signInError = result.error
+        break
+      } catch (err: any) {
+        retries--
+        if (retries === 0) {
+          console.error('Supabase connection failed after retries:', err)
+          return NextResponse.json(
+            { error: 'Unable to connect to authentication service. Please try again later.' },
+            { status: 503 }
+          )
+        }
+        // Wait 1 second before retry
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+    }
 
-    if (signInError || !data.user) {
+    if (signInError || !data?.user) {
+      // Log the actual error for debugging
+      console.error('Login failed:', {
+        error: signInError?.message,
+        email,
+        hasData: !!data,
+        hasUser: !!data?.user
+      })
+      
       // Record failed attempt
       recordAttempt(identifier, ADMIN_LOGIN_RATE_LIMIT)
 

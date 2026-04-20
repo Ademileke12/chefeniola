@@ -14,6 +14,8 @@ import { orderService, calculateEstimatedDelivery } from '@/lib/services/orderSe
 import { emailService } from '@/lib/services/emailService'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { generateCorrelationId } from '@/lib/utils/correlationId'
+import { auditService } from '@/lib/services/auditService'
 import type { CreateWebhookLogData } from '@/types'
 import type Stripe from 'stripe'
 
@@ -61,11 +63,13 @@ async function markWebhookProcessed(
  * Requirements: 2.3, 3.1, 4.1, 4.5, 7.4, 8.1
  */
 async function handleCheckoutSessionCompleted(
-  session: Stripe.Checkout.Session
+  session: Stripe.Checkout.Session,
+  correlationId: string
 ): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@monowaves.com'
   
   console.log('[Webhook] Processing checkout.session.completed')
+  console.log('[Webhook] Correlation ID:', correlationId)
   console.log('[Webhook] Session ID:', session.id)
   console.log('[Webhook] Customer email:', session.customer_details?.email)
   
@@ -74,10 +78,51 @@ async function handleCheckoutSessionCompleted(
     const paymentData = await stripeService.handlePaymentSuccess(session)
     console.log('[Webhook] Payment data extracted successfully')
 
+    // Log payment completed event
+    await auditService.logEvent({
+      eventType: 'payment.completed',
+      severity: 'info',
+      source: 'stripe',
+      correlationId,
+      metadata: {
+        sessionId: session.id,
+        paymentIntentId: paymentData.stripePaymentId,
+        customerEmail: paymentData.customerEmail,
+        amount: paymentData.total,
+        currency: 'usd',
+        itemCount: paymentData.cartItems.length,
+      },
+    })
+
     // Extract tax amount from Stripe session (Requirement 4.1, 4.5)
     const tax = session.total_details?.amount_tax 
       ? session.total_details.amount_tax / 100 
       : 0
+
+    // Check for existing order by session ID (idempotency)
+    console.log('[Webhook] Checking for existing order...')
+    const existingOrder = await orderService.getOrderBySessionId(session.id)
+    
+    if (existingOrder) {
+      console.log(`[Webhook] Order already exists: ${existingOrder.orderNumber} (ID: ${existingOrder.id})`)
+      
+      // Log duplicate prevention
+      await auditService.logEvent({
+        eventType: 'payment.duplicate_prevented',
+        severity: 'warning',
+        source: 'stripe',
+        correlationId,
+        metadata: {
+          sessionId: session.id,
+          existingOrderId: existingOrder.id,
+          existingOrderNumber: existingOrder.orderNumber,
+        },
+      })
+      
+      // Order already processed - skip duplicate processing
+      console.log('[Webhook] Skipping duplicate order processing')
+      return // Early return - order already exists
+    }
 
     // Fetch product details to get gelatoProductUid and designUrl
     const orderItems = await Promise.all(
@@ -107,7 +152,7 @@ async function handleCheckoutSessionCompleted(
     )
     console.log('[Webhook] Product details fetched for', orderItems.length, 'items')
 
-    // Create order in database with tax and session ID (Requirement 4.5)
+    // Create order in database with tax, session ID, and correlation ID (Requirement 4.5)
     console.log('[Webhook] Creating order in database...')
     const order = await orderService.createOrder({
       customerEmail: paymentData.customerEmail,
@@ -117,15 +162,37 @@ async function handleCheckoutSessionCompleted(
       shippingAddress: paymentData.shippingAddress,
       tax,
       total: paymentData.total,
+      correlationId,
     })
 
     console.log(`[Webhook] ✅ Order created: ${order.orderNumber} (ID: ${order.id})`)
     console.log(`[Webhook] Session ID stored: ${order.stripeSessionId}`)
 
+    // Log order created event
+    await auditService.logEvent({
+      eventType: 'order.created',
+      severity: 'info',
+      source: 'stripe',
+      correlationId,
+      metadata: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerEmail: order.customerEmail,
+        total: order.total,
+        itemCount: order.items?.length || 0,
+        sessionId: session.id,
+      },
+    })
+
     // Send confirmation email to customer FIRST (before Gelato submission)
     // This ensures customers get their confirmation even if Gelato fails
     try {
       const estimatedDelivery = calculateEstimatedDelivery(order.createdAt)
+      
+      // Ensure order has required fields for email
+      if (!order.items || order.items.length === 0) {
+        throw new Error('Order has no items')
+      }
       
       await emailService.sendOrderConfirmation({
         to: order.customerEmail,
@@ -135,7 +202,7 @@ async function handleCheckoutSessionCompleted(
         shippingAddress: order.shippingAddress,
         subtotal: order.subtotal,
         shippingCost: order.shippingCost,
-        tax: order.tax,
+        tax: order.tax || 0,
         total: order.total,
         estimatedDelivery,
       })
@@ -144,6 +211,7 @@ async function handleCheckoutSessionCompleted(
     } catch (emailError) {
       // Log email failure but don't fail the webhook
       logger.error('Failed to send confirmation email', {
+        correlationId,
         orderNumber: order.orderNumber,
         customerEmail: order.customerEmail,
         error: emailError instanceof Error ? emailError.message : 'Unknown error',
@@ -162,14 +230,41 @@ async function handleCheckoutSessionCompleted(
     // Submit order to Gelato for fulfillment
     try {
       console.log('[Webhook] Submitting order to Gelato...')
-      await orderService.submitToGelato(order.id)
+      await orderService.submitToGelato(order.id, correlationId)
       console.log(`[Webhook] ✅ Order submitted to Gelato: ${order.orderNumber}`)
+      
+      // Log successful Gelato submission
+      await auditService.logEvent({
+        eventType: 'order.submitted_to_gelato',
+        severity: 'info',
+        source: 'gelato',
+        correlationId,
+        metadata: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+        },
+      })
     } catch (gelatoError) {
       // Log Gelato submission failure and notify admin
       logger.error('Gelato submission failed', {
+        correlationId,
         orderNumber: order.orderNumber,
         orderId: order.id,
         error: gelatoError instanceof Error ? gelatoError.message : 'Unknown error',
+      })
+
+      // Log Gelato submission failure to audit
+      await auditService.logEvent({
+        eventType: 'order.gelato_submission_failed',
+        severity: 'error',
+        source: 'gelato',
+        correlationId,
+        metadata: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          error: gelatoError instanceof Error ? gelatoError.message : 'Unknown error',
+          stack: gelatoError instanceof Error ? gelatoError.stack : undefined,
+        },
       })
 
       // Send admin notification about Gelato failure
@@ -187,6 +282,20 @@ async function handleCheckoutSessionCompleted(
     }
   } catch (error) {
     console.error('[Webhook] ❌ Failed to process checkout session:', error)
+    
+    // Log error with full context
+    await auditService.logEvent({
+      eventType: 'payment.failed',
+      severity: 'error',
+      source: 'stripe',
+      correlationId,
+      metadata: {
+        sessionId: session.id,
+        customerEmail: session.customer_details?.email,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    })
     
     // Send admin notification for any unhandled errors (Requirement 2.3)
     try {
@@ -211,7 +320,8 @@ async function handleCheckoutSessionCompleted(
  * Requirements: 7.5
  */
 async function handlePaymentFailed(
-  paymentIntent: Stripe.PaymentIntent
+  paymentIntent: Stripe.PaymentIntent,
+  correlationId: string
 ): Promise<void> {
   try {
     logger.error('Payment failed', {
@@ -220,6 +330,22 @@ async function handlePaymentFailed(
       currency: paymentIntent.currency,
       status: paymentIntent.status,
       lastPaymentError: paymentIntent.last_payment_error,
+    })
+
+    // Log payment failure to audit service
+    await auditService.logEvent({
+      eventType: 'payment.failed',
+      severity: 'error',
+      source: 'stripe',
+      correlationId,
+      metadata: {
+        paymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount / 100, // Convert to dollars
+        currency: paymentIntent.currency,
+        status: paymentIntent.status,
+        errorCode: paymentIntent.last_payment_error?.code,
+        errorMessage: paymentIntent.last_payment_error?.message,
+      },
     })
 
     // Log to webhook_logs for tracking
@@ -250,6 +376,9 @@ export async function POST(request: NextRequest) {
   console.log('🔔 WEBHOOK RECEIVED - Stripe webhook endpoint called!')
   console.log('Timestamp:', new Date().toISOString())
   
+  // Generate correlation ID for this webhook event
+  const correlationId = generateCorrelationId()
+  
   try {
     // Get raw body and signature
     const body = await request.text()
@@ -257,9 +386,35 @@ export async function POST(request: NextRequest) {
 
     console.log('Body length:', body.length)
     console.log('Has signature:', !!signature)
+    console.log('Correlation ID:', correlationId)
+
+    // Log webhook received event
+    await auditService.logEvent({
+      eventType: 'webhook.received',
+      severity: 'info',
+      source: 'stripe',
+      correlationId,
+      metadata: {
+        hasSignature: !!signature,
+        bodyLength: body.length,
+      },
+    })
 
     if (!signature) {
       console.error('❌ Missing stripe-signature header')
+      
+      // Log signature verification failure
+      await auditService.logEvent({
+        eventType: 'webhook.signature_failed',
+        severity: 'error',
+        source: 'stripe',
+        correlationId,
+        metadata: {
+          reason: 'Missing signature header',
+        },
+        securityFlags: ['MISSING_SIGNATURE'],
+      })
+      
       return NextResponse.json(
         { error: 'Missing signature' },
         { status: 400 }
@@ -270,8 +425,34 @@ export async function POST(request: NextRequest) {
     let event: Stripe.Event
     try {
       event = stripeService.verifyWebhookSignature(body, signature)
+      
+      // Log successful signature verification
+      await auditService.logEvent({
+        eventType: 'webhook.signature_verified',
+        severity: 'info',
+        source: 'stripe',
+        correlationId,
+        metadata: {
+          eventId: event.id,
+          eventType: event.type,
+        },
+      })
     } catch (error) {
       console.error('Webhook signature verification failed:', error)
+      
+      // Log signature verification failure
+      await auditService.logEvent({
+        eventType: 'webhook.signature_failed',
+        severity: 'error',
+        source: 'stripe',
+        correlationId,
+        metadata: {
+          reason: 'Invalid signature',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        securityFlags: ['INVALID_SIGNATURE'],
+      })
+      
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400 }
@@ -293,13 +474,13 @@ export async function POST(request: NextRequest) {
       switch (event.type) {
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session
-          await handleCheckoutSessionCompleted(session)
+          await handleCheckoutSessionCompleted(session, correlationId)
           break
         }
 
         case 'payment_intent.payment_failed': {
           const paymentIntent = event.data.object as Stripe.PaymentIntent
-          await handlePaymentFailed(paymentIntent)
+          await handlePaymentFailed(paymentIntent, correlationId)
           break
         }
 
@@ -312,6 +493,20 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ received: true })
     } catch (error) {
+      // Log error with full context
+      await auditService.logEvent({
+        eventType: 'webhook.received',
+        severity: 'error',
+        source: 'stripe',
+        correlationId,
+        metadata: {
+          eventId: event.id,
+          eventType: event.type,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      })
+      
       // Mark webhook as processed with error
       await markWebhookProcessed(
         event.id,

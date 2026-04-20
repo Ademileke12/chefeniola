@@ -34,8 +34,12 @@ export async function validateProductUid(
   }
 
   try {
+    console.log('[validateProductUid] Validating:', productUid)
+    
     // Try to fetch product details from Gelato
     const productDetails = await gelatoService.getProductDetails(productUid)
+    
+    console.log('[validateProductUid] Validation successful for:', productUid)
     
     return {
       isValid: true,
@@ -44,6 +48,11 @@ export async function validateProductUid(
   } catch (error) {
     // If the product doesn't exist or API error, return invalid
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
+    console.error('[validateProductUid] Validation failed:', {
+      productUid,
+      error: errorMessage
+    })
     
     return {
       isValid: false,

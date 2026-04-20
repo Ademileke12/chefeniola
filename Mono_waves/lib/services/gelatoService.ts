@@ -91,15 +91,50 @@ export class GelatoApiError extends Error {
 
 /**
  * Fetch product catalog from Gelato
- * Filters for clothing categories only: Men's, Women's, Kids & Baby
+ * Filters for clothing categories only: Me n's, Women's, Kids & Baby
  * 
  * Requirements: 1.2, 2.1
  */
 export async function getProductCatalog(): Promise<GelatoProductDetails[]> {
+  // TEST_MODE: Return mock product catalog
+  if (isTestMode()) {
+    console.log('🧪 TEST_MODE: Returning mock product catalog')
+    
+    const mockProducts: GelatoProductDetails[] = [
+      {
+        productUid: 'test-tshirt-001',
+        attributes: {
+          GarmentCategory: 'T-Shirts',
+          GarmentSubcategory: 'Crew Neck',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-hoodie-001',
+        attributes: {
+          GarmentCategory: 'Hoodies',
+          GarmentSubcategory: 'Pullover',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-sweatshirt-001',
+        attributes: {
+          GarmentCategory: 'Sweatshirts',
+          GarmentSubcategory: 'Crew Neck',
+          Brand: 'Test Brand',
+        },
+      },
+    ]
+    
+    console.log(`✅ TEST_MODE: Returning ${mockProducts.length} mock products`)
+    return mockProducts
+  }
+
   try {
     // Gelato has separate catalogs for different product types
     // Fetch from multiple catalogs to get a wide variety of clothing items
-    const catalogs = [
+    const catalogs = [ 
       't-shirts',
       'hoodies',
       'sweatshirts',
@@ -144,14 +179,11 @@ export async function getProductCatalog(): Promise<GelatoProductDetails[]> {
 
     console.log(`\nCatalog fetch summary: ${successfulCatalogs} successful, ${failedCatalogs} failed`)
 
-    // Filter out hats and other accessories we don't want
+    // Filter out only truly irrelevant products (not entire product categories)
     const excludeKeywords = [
-      'hat', 'cap', 'beanie', 'headwear', 'bucket-hat', 'dad-hat',
-      'bag', 'tote', 'backpack',
-      'mug', 'cup', 'bottle',
-      'poster', 'print', 'canvas',
-      'sticker', 'magnet',
-      'phone', 'case', 'cover'
+      'gift card', 'voucher',
+      'sample pack', 'test product',
+      'discontinued', 'legacy'
     ]
 
     const clothingProducts = allProducts.filter(product => {
@@ -185,6 +217,33 @@ export async function getProductDetails(
 ): Promise<GelatoProductDetails> {
   if (!productUid || productUid.trim() === '') {
     throw new Error('Product UID is required')
+  }
+
+  // TEST_MODE: Return mock product details
+  if (isTestMode()) {
+    console.log(`🧪 TEST_MODE: Returning mock product details for ${productUid}`)
+    
+    const mockProduct: GelatoProductDetails = {
+      productUid: productUid,
+      attributes: {
+        GarmentCategory: 'T-Shirts',
+        GarmentSubcategory: 'Crew Neck',
+        Brand: 'Test Brand',
+        Material: '100% Cotton',
+      },
+      weight: {
+        value: 150,
+        measureUnit: 'g',
+      },
+      dimensions: [
+        { name: 'length', nameFormatted: 'Length', value: '70', valueFormatted: '70 cm' },
+        { name: 'width', nameFormatted: 'Width', value: '50', valueFormatted: '50 cm' },
+      ],
+      supportedCountries: ['US', 'GB', 'CA', 'AU'],
+    }
+    
+    console.log('✅ TEST_MODE: Mock product details returned')
+    return mockProduct
   }
 
   try {
@@ -298,11 +357,170 @@ export async function getOrderStatus(
 }
 
 /**
+ * Fetch expanded product catalog from Gelato with minimal filtering
+ * Returns 50+ unique product types including hats, bags, mugs, posters, stickers, phone cases
+ * 
+ * Requirements: 1.1, 1.4, 1.5, 7.1, 7.2
+ */
+export async function getExpandedProductCatalog(): Promise<GelatoProductDetails[]> {
+  // TEST_MODE: Return expanded mock product catalog
+  if (isTestMode()) {
+    console.log('🧪 TEST_MODE: Returning expanded mock product catalog')
+    
+    const mockProducts: GelatoProductDetails[] = [
+      {
+        productUid: 'test-tshirt-001',
+        attributes: {
+          GarmentCategory: 'T-Shirts',
+          GarmentSubcategory: 'Crew Neck',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-hoodie-001',
+        attributes: {
+          GarmentCategory: 'Hoodies',
+          GarmentSubcategory: 'Pullover',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-sweatshirt-001',
+        attributes: {
+          GarmentCategory: 'Sweatshirts',
+          GarmentSubcategory: 'Crew Neck',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-hat-001',
+        attributes: {
+          GarmentCategory: 'Hats',
+          GarmentSubcategory: 'Baseball Cap',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-bag-001',
+        attributes: {
+          GarmentCategory: 'Bags',
+          GarmentSubcategory: 'Tote Bag',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-mug-001',
+        attributes: {
+          GarmentCategory: 'Mugs',
+          GarmentSubcategory: 'Ceramic Mug',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-poster-001',
+        attributes: {
+          GarmentCategory: 'Posters',
+          GarmentSubcategory: 'Art Print',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-sticker-001',
+        attributes: {
+          GarmentCategory: 'Stickers',
+          GarmentSubcategory: 'Die Cut',
+          Brand: 'Test Brand',
+        },
+      },
+      {
+        productUid: 'test-phonecase-001',
+        attributes: {
+          GarmentCategory: 'Phone Cases',
+          GarmentSubcategory: 'iPhone Case',
+          Brand: 'Test Brand',
+        },
+      },
+    ]
+    
+    console.log(`✅ TEST_MODE: Returning ${mockProducts.length} mock products`)
+    return mockProducts
+  }
+
+  try {
+    // Fetch all products from Gelato using the correct endpoint
+    console.log('Fetching all products from Gelato API...')
+    
+    const allProducts: GelatoProductDetails[] = []
+    
+    // Use the correct GET endpoint for fetching products with higher limit
+    // Gelato API supports limit parameter (max 500)
+    const productsResponse = await gelatoFetch<{ products: GelatoProductDetails[] }>(
+      GELATO_PRODUCT_API_BASE_URL,
+      '/v3/products?limit=500',
+      {
+        method: 'GET'
+      }
+    )
+
+    if (productsResponse.products && productsResponse.products.length > 0) {
+      console.log(`✓ Found ${productsResponse.products.length} products from Gelato API`)
+      allProducts.push(...productsResponse.products)
+    }
+
+    if (allProducts.length === 0) {
+      console.warn('⚠ No products fetched from Gelato API')
+      return []
+    }
+
+    // Apply minimal filtering - only exclude truly irrelevant products
+    const excludeKeywords = [
+      'gift card', 'voucher',
+      'sample pack', 'test product',
+      'discontinued', 'legacy'
+    ]
+
+    const filteredProducts = allProducts.filter(product => {
+      const productText = `${product.productUid}`.toLowerCase()
+      const productType = product.productTypeUid?.toLowerCase() || ''
+      const productName = product.productNameUid?.toLowerCase() || ''
+
+      // Exclude products with unwanted keywords
+      const hasExcludeKeyword = excludeKeywords.some(keyword =>
+        productText.includes(keyword) || productType.includes(keyword) || productName.includes(keyword)
+      )
+
+      return !hasExcludeKeyword
+    })
+
+    // Deduplicate products by UID
+    const uniqueProducts = Array.from(
+      new Map(filteredProducts.map(product => [product.productUid, product])).values()
+    )
+
+    console.log(`✓ Filtered ${uniqueProducts.length} unique products from ${allProducts.length} total products`)
+
+    return uniqueProducts
+  } catch (error) {
+    console.error('Failed to fetch expanded Gelato product catalog:', error)
+    throw error
+  }
+}
+
+/**
+ * Submit order to Gelato (alias for createOrder for test compatibility)
+ */
+export async function submitOrder(orderData: GelatoOrderData): Promise<GelatoOrderResponse> {
+  return createOrder(orderData)
+}
+
+/**
  * Gelato service object for easier imports
  */
 export const gelatoService = {
   getProductCatalog,
   getProductDetails,
   createOrder,
+  submitOrder,
   getOrderStatus,
+  getExpandedProductCatalog,
 }

@@ -14,6 +14,8 @@
     "@supabase/supabase-js": "^2.45.4",
     "@types/fabric": "^5.3.11",
     "fabric": "^7.2.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.577.0",
     "next": "14.2.18",
     "react": "^18.3.1",

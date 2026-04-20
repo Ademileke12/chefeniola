@@ -47,19 +47,22 @@ export interface GelatoOrderStatus {
 }
 
 export interface GelatoProductDetails {
+  id?: string
   productUid: string
-  attributes: {
+  productNameUid?: string
+  productTypeUid?: string
+  dimensions?: Array<{
+    name: string
+    nameFormatted: string
+    value: string
+    valueFormatted: string
+  }>
+  attributes?: {
     [key: string]: string
   }
   weight?: {
     value: number
     measureUnit: string
-  }
-  dimensions?: {
-    [key: string]: {
-      value: number
-      measureUnit: string
-    }
   }
   supportedCountries?: string[]
 }

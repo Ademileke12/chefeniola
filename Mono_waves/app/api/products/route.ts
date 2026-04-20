@@ -62,9 +62,19 @@ export async function POST(request: NextRequest) {
     if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
+    
+    console.log('[POST /api/products] Received product data:', {
+      name: body.name,
+      price: body.price,
+      gelatoProductUid: body.gelatoProductUid,
+      hasDesignUrl: !!body.designFileUrl,
+      hasDesignData: !!body.designData,
+      variantsCount: body.variants?.length || 0
+    })
 
     // Validate required fields
     if (!body.name || !body.price || !body.gelatoProductUid) {
+      console.error('[POST /api/products] Missing required fields')
       return NextResponse.json(
         { error: 'Missing required fields: name, price, and gelatoProductUid are required' },
         { status: 400 }
@@ -134,9 +144,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ product }, { status: 201 })
   } catch (error) {
-    console.error('Error creating product:', error)
+    console.error('[POST /api/products] Error creating product:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create product'
     return NextResponse.json(
-      { error: 'Failed to create product' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

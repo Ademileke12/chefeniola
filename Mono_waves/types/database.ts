@@ -47,6 +47,7 @@ export interface DatabaseOrder {
   status: string
   tracking_number: string | null
   carrier: string | null
+  correlation_id: string | null
   created_at: string
   updated_at: string
 }

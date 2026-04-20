@@ -229,9 +229,43 @@ export default function AdminDashboardPage() {
     loadDashboardData()
   }, [])
 
-  const handleDownloadReport = () => {
-    // TODO: Implement report download functionality
-    console.log('Download report clicked')
+  const handleDownloadReport = async () => {
+    try {
+      setRetrying(true)
+      
+      // Fetch the PDF report
+      const response = await authenticatedFetch('/api/admin/dashboard/report')
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate report')
+      }
+      
+      // Get the PDF blob
+      const blob = await response.blob()
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0]
+      link.download = `mono-waves-dashboard-report-${timestamp}.pdf`
+      
+      // Trigger download
+      document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+    } catch (error) {
+      console.error('Failed to download report:', error)
+      alert('Failed to download report. Please try again.')
+    } finally {
+      setRetrying(false)
+    }
   }
 
   const handleInventorySubmit = (data: any) => {
@@ -270,11 +304,22 @@ export default function AdminDashboardPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
           <button
             onClick={handleDownloadReport}
-            className="flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base shadow-lg active:scale-95"
+            disabled={retrying}
+            className="flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">DOWNLOAD REPORT</span>
-            <span className="sm:hidden">REPORT</span>
+            {retrying ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span className="hidden sm:inline">GENERATING...</span>
+                <span className="sm:hidden">WAIT...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">DOWNLOAD REPORT</span>
+                <span className="sm:hidden">REPORT</span>
+              </>
+            )}
           </button>
         </div>
 

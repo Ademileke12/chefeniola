@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { orderService } from '@/lib/services/orderService'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { generateCorrelationId } from '@/lib/utils/correlationId'
+import { auditService } from '@/lib/services/auditService'
 import type { CreateWebhookLogData, OrderStatus } from '@/types'
 import crypto from 'crypto'
 
@@ -134,9 +136,14 @@ function mapGelatoStatus(gelatoStatus: string): OrderStatus {
  * 
  * Requirements: 10.3, 10.4, 10.5
  */
-async function handleOrderStatusUpdate(event: GelatoWebhookEvent): Promise<void> {
+async function handleOrderStatusUpdate(event: GelatoWebhookEvent, correlationId: string): Promise<void> {
   try {
     const { orderReferenceId, status, trackingNumber, carrier } = event.data
+
+    console.log('[Gelato Webhook] Processing order status update')
+    console.log('[Gelato Webhook] Correlation ID:', correlationId)
+    console.log('[Gelato Webhook] Order Reference ID:', orderReferenceId)
+    console.log('[Gelato Webhook] Status:', status)
 
     // Find order by order number (which is our orderReferenceId)
     const { data: orders, error: fetchError } = await supabaseAdmin
@@ -167,11 +174,28 @@ async function handleOrderStatusUpdate(event: GelatoWebhookEvent): Promise<void>
 
     console.log(`Order ${orderReferenceId} updated to status: ${internalStatus}`)
 
+    // Log tracking information received if available
     if (trackingData) {
       console.log(`Tracking info: ${carrier} - ${trackingNumber}`)
+      console.log(`Correlation ID: ${correlationId}`)
+      
+      // Log tracking received event to audit service
+      await auditService.logEvent({
+        eventType: 'tracking.received',
+        severity: 'info',
+        source: 'gelato',
+        correlationId,
+        metadata: {
+          orderId,
+          orderNumber: orderReferenceId,
+          trackingNumber,
+          carrier,
+          status: internalStatus,
+        },
+      })
     }
   } catch (error) {
-    logger.error('Failed to process order status update', error)
+    logger.error('Failed to process order status update', { correlationId, error })
     throw error
   }
 }
@@ -185,19 +209,62 @@ async function handleOrderStatusUpdate(event: GelatoWebhookEvent): Promise<void>
  * Requirements: 10.1, 10.2, 10.3, 10.4
  */
 export async function POST(request: NextRequest) {
+  // Generate correlation ID for this webhook event
+  const correlationId = generateCorrelationId()
+  
   try {
     // Get raw body and signature
     const body = await request.text()
     const signature = request.headers.get('x-gelato-signature')
 
+    console.log('[Gelato Webhook] Received webhook')
+    console.log('[Gelato Webhook] Correlation ID:', correlationId)
+    console.log('[Gelato Webhook] Has signature:', !!signature)
+
+    // Log webhook received event
+    await auditService.logEvent({
+      eventType: 'webhook.received',
+      severity: 'info',
+      source: 'gelato',
+      correlationId,
+      metadata: {
+        hasSignature: !!signature,
+        bodyLength: body.length,
+      },
+    })
+
     // Verify webhook signature (Requirement 10.2)
     if (!signature || !verifyGelatoSignature(body, signature)) {
       console.error('Gelato webhook signature verification failed')
+      
+      // Log signature verification failure
+      await auditService.logEvent({
+        eventType: 'webhook.signature_failed',
+        severity: 'error',
+        source: 'gelato',
+        correlationId,
+        metadata: {
+          reason: !signature ? 'Missing signature' : 'Invalid signature',
+        },
+        securityFlags: !signature ? ['MISSING_SIGNATURE'] : ['INVALID_SIGNATURE'],
+      })
+      
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400 }
       )
     }
+
+    // Log successful signature verification
+    await auditService.logEvent({
+      eventType: 'webhook.signature_verified',
+      severity: 'info',
+      source: 'gelato',
+      correlationId,
+      metadata: {
+        verified: true,
+      },
+    })
 
     // Parse webhook event
     let event: GelatoWebhookEvent
@@ -229,7 +296,7 @@ export async function POST(request: NextRequest) {
         case 'order.delivered':
         case 'order.cancelled':
         case 'order.failed':
-          await handleOrderStatusUpdate(event)
+          await handleOrderStatusUpdate(event, correlationId)
           break
 
         default:

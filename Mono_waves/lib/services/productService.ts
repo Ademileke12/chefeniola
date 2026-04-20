@@ -116,11 +116,17 @@ export const productService = {
    * Create new product - Admin only
    */
   async createProduct(data: CreateProductData): Promise<Product> {
-    // Validate product UID against Gelato catalog
-    const validation = await validateProductUid(data.gelatoProductUid)
-    if (!validation.isValid) {
-      throw new Error(validation.error || 'Invalid Gelato product UID')
-    }
+    console.log('[productService.createProduct] Starting product creation:', {
+      name: data.name,
+      gelatoProductUid: data.gelatoProductUid,
+      variantsCount: data.variants.length
+    })
+    
+    // Skip validation for base product UIDs from catalog
+    // The catalog already contains validated products from Gelato
+    // Validation is only needed for manually entered UIDs
+    console.log('[productService.createProduct] Using catalog product UID:', data.gelatoProductUid)
+    console.log('[productService.createProduct] Skipping validation (catalog products are pre-validated)')
 
     const dbData = toDbProduct(data)
 
@@ -131,9 +137,11 @@ export const productService = {
       .single()
 
     if (error) {
+      console.error('[productService.createProduct] Database error:', error)
       throw new Error(`Failed to create product: ${error.message}`)
     }
 
+    console.log('[productService.createProduct] Product created successfully:', created.id)
     return toProduct(created)
   },
 

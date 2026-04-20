@@ -47,8 +47,17 @@ export default function AdminLoginPage() {
         return
       }
 
+      // Set the session in the client
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        })
+      }
+
       // Successful login - redirect to admin dashboard
-      router.push('/admin')
+      // Use window.location for a full page reload to ensure session is recognized
+      window.location.href = '/admin'
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Failed to sign in')

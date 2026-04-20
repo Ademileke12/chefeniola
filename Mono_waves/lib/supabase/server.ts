@@ -22,5 +22,15 @@ export const supabaseAdmin = isConfigured
         autoRefreshToken: false,
         persistSession: false,
       },
+      global: {
+        fetch: (url, options = {}) => {
+          return fetch(url, {
+            ...options,
+            // Increase timeout and add keepalive
+            signal: options.signal || AbortSignal.timeout(30000),
+            keepalive: true,
+          })
+        },
+      },
     })
   : (null as any) // Allow null in test environment when not configured

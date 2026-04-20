@@ -4,6 +4,11 @@ require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env.lo
 // Add fetch polyfill for Node.js environment
 require('whatwg-fetch')
 
+// Add TextEncoder/TextDecoder polyfill for Node.js environment
+const { TextEncoder, TextDecoder } = require('util')
+global.TextEncoder = TextEncoder
+global.TextDecoder = TextDecoder
+
 // Now import testing library
 require('@testing-library/jest-dom')
 

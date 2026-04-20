@@ -12,6 +12,7 @@ import {
   User,
   LogOut,
   LifeBuoy,
+  Shield,
   X
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
@@ -42,6 +43,11 @@ const navigationItems = [
     name: 'Designs',
     href: '/admin/designs',
     icon: Palette,
+  },
+  {
+    name: 'Security',
+    href: '/admin/security',
+    icon: Shield,
   },
   {
     name: 'Support',
