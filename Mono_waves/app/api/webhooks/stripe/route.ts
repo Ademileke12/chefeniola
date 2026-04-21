@@ -196,6 +196,14 @@ async function handleCheckoutSessionCompleted(
           gelatoProductUid = gelatoProductUid || product.gelato_product_uid
         }
 
+        // Ensure required fields are present
+        if (!designUrl) {
+          throw new Error(`Design URL missing for product: ${item.productId}`)
+        }
+        if (!gelatoProductUid) {
+          throw new Error(`Gelato Product UID missing for product: ${item.productId}`)
+        }
+
         return {
           productId: item.productId,
           productName: item.productName,
