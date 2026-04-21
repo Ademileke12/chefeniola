@@ -119,27 +119,58 @@ export async function createCheckoutSession(
     // Combine product line items with shipping line item
     const allLineItems = [...lineItems, shippingLineItem]
 
-    // Prepare metadata - strip out long fields to stay under 500 char limit
+    // Prepare metadata - aggressively minimize to stay under 500 char limit per field
+    // Store only essential data needed for order creation
     const cartItemsForMetadata = data.cartItems.map(item => ({
-      id: item.id,
-      productId: item.productId,
-      productName: item.productName.substring(0, 50), // Truncate long names
-      size: item.size,
-      color: item.color,
-      price: item.price,
-      quantity: item.quantity,
-      // Omit imageUrl - it's too long and not needed in metadata
+      pid: item.productId, // Shortened key
+      qty: item.quantity,  // Shortened key
+      prc: item.price,     // Shortened key
     }))
 
     const shippingForMetadata = {
-      firstName: data.shippingAddress.firstName,
-      lastName: data.shippingAddress.lastName,
-      addressLine1: data.shippingAddress.addressLine1,
-      city: data.shippingAddress.city,
-      state: data.shippingAddress.state,
-      postCode: data.shippingAddress.postCode,
-      country: data.shippingAddress.country,
-      phone: data.shippingAddress.phone,
+      fn: data.shippingAddress.firstName,
+      ln: data.shippingAddress.lastName,
+      a1: data.shippingAddress.addressLine1,
+      a2: data.shippingAddress.addressLine2 || '',
+      ct: data.shippingAddress.city,
+      st: data.shippingAddress.state,
+      pc: data.shippingAddress.postCode,
+      co: data.shippingAddress.country,
+      ph: data.shippingAddress.phone,
+    }
+
+    // Check metadata size and truncate if needed
+    const cartItemsJson = JSON.stringify(cartItemsForMetadata)
+    const shippingJson = JSON.stringify(shippingForMetadata)
+    
+    // Stripe has a 500 character limit per metadata value
+    let finalCartItems: string
+    if (cartItemsJson.length > 500) {
+      console.warn('[StripeService] Cart items metadata exceeds 500 chars, truncating')
+      // Store only count and total if too large
+      const simplifiedCart = {
+        count: data.cartItems.length,
+        total: data.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      }
+      finalCartItems = JSON.stringify(simplifiedCart)
+    } else {
+      finalCartItems = cartItemsJson
+    }
+
+    let finalShipping: string
+    if (shippingJson.length > 500) {
+      console.warn('[StripeService] Shipping metadata exceeds 500 chars, truncating')
+      // Keep only essential fields
+      const simplifiedShipping = {
+        fn: data.shippingAddress.firstName,
+        ln: data.shippingAddress.lastName,
+        ct: data.shippingAddress.city,
+        st: data.shippingAddress.state,
+        co: data.shippingAddress.country,
+      }
+      finalShipping = JSON.stringify(simplifiedShipping)
+    } else {
+      finalShipping = shippingJson
     }
 
     // Create checkout session
@@ -151,8 +182,8 @@ export async function createCheckoutSession(
       success_url: data.successUrl,
       cancel_url: data.cancelUrl,
       metadata: {
-        cartItems: JSON.stringify(cartItemsForMetadata),
-        shippingAddress: JSON.stringify(shippingForMetadata),
+        cartItems: finalCartItems,
+        shippingAddress: finalShipping,
         shippingCost: data.shippingCost.toFixed(2), // Include shipping cost in metadata (Requirement 2.3)
       },
       shipping_address_collection: {
@@ -270,11 +301,53 @@ export async function handlePaymentSuccess(
   }
 
   try {
-    const cartItems: CartItem[] = JSON.parse(metadata.cartItems)
-    const shippingAddress: ShippingAddress = JSON.parse(metadata.shippingAddress)
+    const cartItemsData = JSON.parse(metadata.cartItems)
+    const shippingData = JSON.parse(metadata.shippingAddress)
 
-    // Note: cartItems from metadata don't include imageUrl (to save space)
-    // If you need full cart data, fetch from database using session metadata
+    // Check if we have full cart data or simplified data
+    let cartItems: CartItem[]
+    if (Array.isArray(cartItemsData)) {
+      // Full cart data with shortened keys
+      cartItems = cartItemsData.map((item: any) => ({
+        id: item.id || `${item.pid}-${Date.now()}`, // Generate ID if missing
+        productId: item.pid || item.productId,
+        productName: item.pn || item.productName || 'Product',
+        size: item.sz || item.size || '',
+        color: item.cl || item.color || '',
+        quantity: item.qty || item.quantity || 1,
+        price: item.prc || item.price || 0,
+        imageUrl: '', // Not stored in metadata
+      }))
+    } else if (cartItemsData.count) {
+      // Simplified cart data - we'll need to fetch full data from cart service
+      // For now, create placeholder items
+      console.warn('[StripeService] Cart metadata was truncated, using simplified data')
+      cartItems = [{
+        id: `placeholder-${Date.now()}`,
+        productId: 'unknown',
+        productName: 'Product',
+        size: '',
+        color: '',
+        quantity: cartItemsData.count,
+        price: cartItemsData.total / cartItemsData.count,
+        imageUrl: '',
+      }]
+    } else {
+      throw new Error('Invalid cart items format in metadata')
+    }
+
+    // Parse shipping address with both full and shortened keys
+    const shippingAddress: ShippingAddress = {
+      firstName: shippingData.fn || shippingData.firstName || '',
+      lastName: shippingData.ln || shippingData.lastName || '',
+      addressLine1: shippingData.a1 || shippingData.addressLine1 || '',
+      addressLine2: shippingData.a2 || shippingData.addressLine2,
+      city: shippingData.ct || shippingData.city || '',
+      state: shippingData.st || shippingData.state || '',
+      postCode: shippingData.pc || shippingData.postCode || '',
+      country: shippingData.co || shippingData.country || '',
+      phone: shippingData.ph || shippingData.phone || '',
+    }
 
     // Calculate total from session amount
     const total = session.amount_total ? session.amount_total / 100 : 0
