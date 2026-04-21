@@ -177,7 +177,7 @@ This plan implements fixes for the order confirmation flow production issues. Th
     - Verify delays match expected pattern
     - Run 100 iterations
 
-- [-] 9. Checkpoint - Verify confirmation page polling
+- [ ] 9. Checkpoint - Verify confirmation page polling
   - Ensure all tests pass, ask the user if questions arise.
 
 

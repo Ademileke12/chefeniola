@@ -23,6 +23,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const sessionId = body.sessionId || 'cs_test_b1CTYbGE5bN8BjF1BbUWAOKqZna1gtNHrHIq5pyoiPyVfX7OSWt9EstiHQ'
 
+    // Calculate costs
+    const subtotal = 59.98 + 49.99 // 2 * 29.99 + 1 * 49.99
+    const shippingCost = 10.00
+    const tax = 8.50
+    const total = subtotal + shippingCost + tax // 118.47
+
     // Create a test order
     const order = await orderService.createOrder({
       customerEmail: 'test@example.com',
@@ -61,8 +67,10 @@ export async function POST(request: NextRequest) {
         country: 'US',
         phone: '+1 (555) 123-4567',
       },
-      tax: 8.50,
-      total: 118.47,
+      subtotal,
+      shippingCost,
+      tax,
+      total,
     })
 
     return NextResponse.json({
