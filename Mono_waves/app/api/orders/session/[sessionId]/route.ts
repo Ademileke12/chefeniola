@@ -29,6 +29,22 @@ export async function GET(
       )
     }
 
+    // Check if using test session ID in production
+    const isTestSession = sessionId.startsWith('cs_test_')
+    const isProduction = process.env.NODE_ENV === 'production'
+    
+    if (isTestSession && isProduction) {
+      logger.warn('Test session ID used in production', { sessionId })
+      return NextResponse.json(
+        { 
+          error: 'Test session not valid in production',
+          message: 'This is a test payment session. Please use live Stripe keys and make a real payment in production.',
+          sessionId 
+        },
+        { status: 400 }
+      )
+    }
+
     // Fetch order by session ID (Requirements: 4.1)
     const order = await orderService.getOrderBySessionId(sessionId)
 
@@ -36,7 +52,11 @@ export async function GET(
     if (!order) {
       logger.info('Order not found for session', { sessionId })
       return NextResponse.json(
-        { error: 'Order not found' },
+        { 
+          error: 'Order not found',
+          message: 'Your payment was successful, but we\'re still processing your order. Please check your email for confirmation or contact support.',
+          sessionId
+        },
         { status: 404 }
       )
     }
