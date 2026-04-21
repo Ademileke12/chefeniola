@@ -123,8 +123,13 @@ export async function createCheckoutSession(
     // Store only essential data needed for order creation
     const cartItemsForMetadata = data.cartItems.map(item => ({
       pid: item.productId, // Shortened key
+      pn: item.productName, // Product name
       qty: item.quantity,  // Shortened key
       prc: item.price,     // Shortened key
+      sz: item.size,       // Size - REQUIRED for Gelato
+      cl: item.color,      // Color - REQUIRED for Gelato
+      du: item.designUrl,  // Design URL - REQUIRED for Gelato
+      gpu: item.gelatoProductUid, // Gelato product UID - REQUIRED for Gelato
     }))
 
     const shippingForMetadata = {
@@ -317,6 +322,8 @@ export async function handlePaymentSuccess(
         quantity: item.qty || item.quantity || 1,
         price: item.prc || item.price || 0,
         imageUrl: '', // Not stored in metadata
+        designUrl: item.du || item.designUrl, // Design URL from metadata
+        gelatoProductUid: item.gpu || item.gelatoProductUid, // Gelato product UID from metadata
       }))
     } else if (cartItemsData.count) {
       // Simplified cart data - we'll need to fetch full data from cart service

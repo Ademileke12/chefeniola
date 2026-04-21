@@ -16,4 +16,6 @@ export interface CartItem {
   quantity: number
   price: number
   imageUrl: string
+  designUrl?: string // URL to the custom design file
+  gelatoProductUid?: string // Gelato product UID for fulfillment
 }

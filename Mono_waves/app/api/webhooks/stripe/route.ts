@@ -172,17 +172,28 @@ async function handleCheckoutSessionCompleted(
     }
 
     // Fetch product details to get gelatoProductUid and designUrl
+    // First try to use data from cart items (which comes from Stripe metadata)
+    // If not available, fall back to fetching from database
     const orderItems = await Promise.all(
       paymentData.cartItems.map(async (item) => {
-        // Fetch product from database
-        const { data: product, error } = await supabaseAdmin
-          .from('products')
-          .select('gelato_product_uid, design_url')
-          .eq('id', item.productId)
-          .single()
+        let designUrl = item.designUrl
+        let gelatoProductUid = item.gelatoProductUid
 
-        if (error || !product) {
-          throw new Error(`Product not found: ${item.productId}`)
+        // If design URL or gelato product UID not in cart metadata, fetch from database
+        if (!designUrl || !gelatoProductUid) {
+          const { data: product, error } = await supabaseAdmin
+            .from('products')
+            .select('gelato_product_uid, design_url')
+            .eq('id', item.productId)
+            .single()
+
+          if (error || !product) {
+            throw new Error(`Product not found: ${item.productId}`)
+          }
+
+          // Use database values as fallback
+          designUrl = designUrl || product.design_url
+          gelatoProductUid = gelatoProductUid || product.gelato_product_uid
         }
 
         return {
@@ -192,8 +203,8 @@ async function handleCheckoutSessionCompleted(
           color: item.color,
           quantity: item.quantity,
           price: item.price,
-          designUrl: product.design_url,
-          gelatoProductUid: product.gelato_product_uid,
+          designUrl,
+          gelatoProductUid,
         }
       })
     )
