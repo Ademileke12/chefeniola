@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { Trash2, Plus, Upload, AlertCircle } from 'lucide-react';
 import { compressImage } from '../../lib/imageOptimizer';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface GalleryImage {
   id: string;
@@ -18,6 +19,9 @@ export default function AdminGallery() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>('');
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchImages();
@@ -116,11 +120,23 @@ export default function AdminGallery() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this image?")) return;
+    setItemToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+    
+    setIsDeleting(true);
     try {
-      await supabase.from('gallery').delete().eq('id', id);
+      await supabase.from('gallery').delete().eq('id', itemToDelete);
+      setDeleteModalOpen(false);
+      setItemToDelete(null);
     } catch (error) {
       console.error("Failed to delete image:", error);
+      setError('Failed to delete image');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -272,6 +288,18 @@ export default function AdminGallery() {
           </div>
         )}
       </div>
+
+      <DeleteConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Image"
+        message="Are you sure you want to delete this image from the gallery? This action cannot be undone."
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }
