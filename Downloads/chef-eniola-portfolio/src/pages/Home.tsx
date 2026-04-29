@@ -4,7 +4,9 @@ import Hero from '../components/Hero';
 import About from '../components/About';
 import LocalGallery from '../components/LocalGallery';
 import Reviews from '../components/Reviews';
+import ImageReviews from '../components/ImageReviews';
 import LocalVideos from '../components/LocalVideos';
+import Contact from '../components/Contact';
 import Footer from '../components/Footer';
 import WhatsAppButton from '../components/WhatsAppButton';
 
@@ -17,7 +19,9 @@ export default function Home() {
         <About />
         <LocalGallery />
         <Reviews />
+        <ImageReviews />
         <LocalVideos />
+        <Contact />
       </main>
       <Footer />
       <WhatsAppButton />

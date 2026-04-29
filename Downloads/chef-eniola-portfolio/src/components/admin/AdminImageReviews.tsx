@@ -2,41 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { Trash2, Plus, Upload, AlertCircle } from 'lucide-react';
 
-interface Review {
+interface ImageReview {
   id: string;
-  customername: string;
-  reviewtext: string;
-  imageurl?: string;
+  imageurl: string;
+  customername?: string;
 }
 
-export default function AdminReviews() {
-  const [reviews, setReviews] = useState<Review[]>([]);
+export default function AdminImageReviews() {
+  const [imageReviews, setImageReviews] = useState<ImageReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [formData, setFormData] = useState({ customerName: '', reviewText: '', imageUrl: '' });
+  const [formData, setFormData] = useState({ imageUrl: '', customerName: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>('');
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('url');
 
   useEffect(() => {
-    const fetchReviews = async () => {
+    const fetchImageReviews = async () => {
       const { data, error } = await supabase
-        .from('reviews')
+        .from('image_reviews')
         .select('*')
         .order('createdat', { ascending: false });
 
       if (!error && data) {
-        setReviews(data as Review[]);
+        setImageReviews(data as ImageReview[]);
       }
       setLoading(false);
     };
 
-    fetchReviews();
+    fetchImageReviews();
 
     const channel = supabase
-      .channel('admin_reviews_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, fetchReviews)
+      .channel('admin_image_reviews_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'image_reviews' }, fetchImageReviews)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -59,7 +58,7 @@ export default function AdminReviews() {
   const uploadImageFile = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-    const filePath = `reviews/${fileName}`;
+    const filePath = `image-reviews/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('videos')
@@ -78,8 +77,13 @@ export default function AdminReviews() {
     e.preventDefault();
     setError('');
 
-    if (!formData.customerName || !formData.reviewText) {
-      setError('Please fill in customer name and review text');
+    if (uploadMode === 'file' && !imageFile) {
+      setError('Please select an image file');
+      return;
+    }
+
+    if (uploadMode === 'url' && !formData.imageUrl) {
+      setError('Please enter an image URL');
       return;
     }
     
@@ -92,49 +96,48 @@ export default function AdminReviews() {
       }
 
       const dataToSave: any = {
-        customername: formData.customerName,
-        reviewtext: formData.reviewText,
+        imageurl: finalImageUrl,
         createdat: new Date().toISOString()
       };
-      if (finalImageUrl) dataToSave.imageurl = finalImageUrl;
+      if (formData.customerName) dataToSave.customername = formData.customerName;
 
-      const { error } = await supabase.from('reviews').insert([dataToSave]);
+      const { error } = await supabase.from('image_reviews').insert([dataToSave]);
       if (error) throw error;
       
-      setFormData({ customerName: '', reviewText: '', imageUrl: '' });
+      setFormData({ imageUrl: '', customerName: '' });
       setImageFile(null);
       setIsAdding(false);
     } catch (error: any) {
-      console.error("Failed to add review:", error);
-      setError(error.message || "Failed to add review. Make sure you are an admin.");
+      console.error("Failed to add image review:", error);
+      setError(error.message || "Failed to add image review. Make sure you are an admin.");
     } finally {
       setUploading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this review?")) return;
+    if (!window.confirm("Are you sure you want to delete this image review?")) return;
     try {
-      await supabase.from('reviews').delete().eq('id', id);
+      await supabase.from('image_reviews').delete().eq('id', id);
     } catch (error) {
-      console.error("Failed to delete review:", error);
+      console.error("Failed to delete image review:", error);
     }
   };
 
-  if (loading) return <div className="py-12 text-center font-medium" style={{color: '#ffffff99'}}>Loading reviews...</div>;
+  if (loading) return <div className="py-12 text-center font-medium" style={{color: '#ffffff99'}}>Loading image reviews...</div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold" style={{color: '#ffffff'}}>Customer Reviews</h2>
-          <p className="text-base mt-2 font-medium" style={{color: '#ffffff99'}}>Manage customer testimonials</p>
+          <h2 className="text-3xl font-bold" style={{color: '#ffffff'}}>Image Reviews</h2>
+          <p className="text-base mt-2 font-medium" style={{color: '#ffffff99'}}>Manage customer moment images</p>
         </div>
         <button 
           onClick={() => setIsAdding(!isAdding)}
           className="flex items-center gap-2 px-5 py-3 bg-brand-accent text-brand-bg rounded-xl text-sm font-semibold hover:bg-brand-accent/90 transition-all shadow-lg hover:shadow-xl"
         >
-          <Plus size={18} /> Add Review
+          <Plus size={18} /> Add Image Review
         </button>
       </div>
 
@@ -149,32 +152,8 @@ export default function AdminReviews() {
 
           <div className="grid gap-4 mb-4">
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Customer Name *</label>
-              <input 
-                type="text" 
-                required 
-                value={formData.customerName}
-                onChange={e => setFormData({...formData, customerName: e.target.value})}
-                className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
-                placeholder="e.g. Amina B."
-                style={{color: '#ffffff'}}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Review Text *</label>
-              <textarea 
-                required
-                value={formData.reviewText}
-                onChange={e => setFormData({...formData, reviewText: e.target.value})}
-                className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium h-24 resize-none"
-                placeholder="What did they say?"
-                style={{color: '#ffffff'}}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Customer Image (Optional)</label>
-              <div className="flex gap-4 mb-3">
+              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Upload Method</label>
+              <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -196,32 +175,49 @@ export default function AdminReviews() {
                   <span className="text-sm font-semibold" style={{color: '#ffffff'}}>Upload File</span>
                 </label>
               </div>
+            </div>
 
-              {uploadMode === 'url' ? (
+            {uploadMode === 'url' ? (
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Image URL *</label>
                 <input 
                   type="text" 
+                  required 
                   value={formData.imageUrl}
                   onChange={e => setFormData({...formData, imageUrl: e.target.value})}
                   className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
-                  placeholder="https://..."
+                  placeholder="https://... or /gl/photo.jpg"
                   style={{color: '#ffffff'}}
                 />
-              ) : (
-                <>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
-                    style={{color: '#ffffff'}}
-                  />
-                  {imageFile && (
-                    <p className="text-sm text-brand-accent mt-2 font-semibold">
-                      Selected: {imageFile.name}
-                    </p>
-                  )}
-                </>
-              )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Image File *</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
+                  style={{color: '#ffffff'}}
+                />
+                {imageFile && (
+                  <p className="text-sm text-brand-accent mt-2 font-semibold">
+                    Selected: {imageFile.name}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Customer Name (Optional)</label>
+              <input 
+                type="text" 
+                value={formData.customerName}
+                onChange={e => setFormData({...formData, customerName: e.target.value})}
+                className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
+                placeholder="e.g. John D."
+                style={{color: '#ffffff'}}
+              />
             </div>
           </div>
 
@@ -232,7 +228,7 @@ export default function AdminReviews() {
                 setIsAdding(false);
                 setError('');
                 setImageFile(null);
-                setFormData({ customerName: '', reviewText: '', imageUrl: '' });
+                setFormData({ imageUrl: '', customerName: '' });
               }} 
               className="px-5 py-2.5 text-sm font-semibold hover:bg-white/10 rounded-lg transition-all"
               disabled={uploading}
@@ -253,7 +249,7 @@ export default function AdminReviews() {
               ) : (
                 <>
                   <Upload size={16} />
-                  Save Review
+                  Save Image Review
                 </>
               )}
             </button>
@@ -261,32 +257,27 @@ export default function AdminReviews() {
         </form>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {reviews.map(review => (
-          <div key={review.id} className="relative bg-brand-bg rounded-xl p-6 border-2 border-brand-accent/20 shadow-sm flex flex-col hover:shadow-lg transition-all">
-            <p className="italic mb-6 flex-1" style={{color: '#ffffffcc'}}>"{review.reviewtext}"</p>
-            <div className="flex items-center gap-3">
-              {review.imageurl ? (
-                <img src={review.imageurl} alt={review.customername} className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-brand-accent/20 flex items-center justify-center text-brand-accent font-semibold text-lg">
-                  {review.customername.charAt(0)}
-                </div>
-              )}
-              <span className="font-semibold text-base" style={{color: '#ffffff'}}>{review.customername}</span>
-            </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {imageReviews.map(review => (
+          <div key={review.id} className="group relative aspect-square bg-brand-bg rounded-xl overflow-hidden border-2 border-brand-accent/20 shadow-sm hover:shadow-lg transition-all">
+            <img src={review.imageurl} alt={review.customername || 'Customer review'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            {review.customername && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                <p className="text-sm font-semibold truncate" style={{color: '#ffffff'}}>{review.customername}</p>
+              </div>
+            )}
             <button 
               onClick={() => handleDelete(review.id)}
-              className="absolute top-4 right-4 text-white/40 hover:text-red-400 hover:bg-red-500/10 p-2 rounded-lg transition-colors"
+              className="absolute top-2 right-2 w-9 h-9 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-red-600"
             >
               <Trash2 size={18} />
             </button>
           </div>
         ))}
-        {reviews.length === 0 && !isAdding && (
+        {imageReviews.length === 0 && !isAdding && (
           <div className="col-span-full py-16 text-center bg-brand-bg/30 rounded-2xl border-2 border-dashed border-brand-accent/30">
-            <p className="text-lg font-bold" style={{color: '#ffffff99'}}>No reviews added yet.</p>
-            <p className="text-base mt-1 font-medium" style={{color: '#ffffff99'}}>Click "Add Review" to get started.</p>
+            <p className="text-lg font-bold" style={{color: '#ffffff99'}}>No image reviews added yet.</p>
+            <p className="text-base mt-1 font-medium" style={{color: '#ffffff99'}}>Click "Add Image Review" to get started.</p>
           </div>
         )}
       </div>

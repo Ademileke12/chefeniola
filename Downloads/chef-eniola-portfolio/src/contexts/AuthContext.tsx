@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
   loading: boolean;
-  login: () => Promise<void>;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
 
@@ -14,7 +14,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isAdmin: false,
   loading: true,
-  login: async () => {},
+  login: async () => ({ error: null }),
   logout: async () => {},
 });
 
@@ -27,14 +27,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        checkAdminStatus(session.user);
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          checkAdminStatus(session.user);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting session:', error);
         setLoading(false);
-      }
-    });
+      });
 
     // Listen to auth changes
     const {
@@ -54,25 +59,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAdminStatus = async (currentUser: User) => {
     try {
-      if (currentUser.email === 'samuelabudud@gmail.com') {
-          // Special bootstrap admin
-          setIsAdmin(true);
-          
-          // Optionally upsert the user into the users table but RLS might block it from client
-          // So we simply assume they have admin privileges in the UI.
+      const masterAdminEmail = import.meta.env.VITE_MASTER_ADMIN_EMAIL || 'oluwafemieniolavico@gmail.com';
+      
+      if (currentUser.email === masterAdminEmail) {
+        // Master admin from environment variable
+        setIsAdmin(true);
       } else {
-          // Check from DB
-          const { data, error } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', currentUser.id)
-            .single();
-            
-          if (!error && data?.role === 'admin') {
-              setIsAdmin(true);
-          } else {
-              setIsAdmin(false);
-          }
+        // Check from DB for other admins
+        const { data, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', currentUser.id)
+          .single();
+          
+        if (!error && data?.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
       }
     } catch (err) {
       console.error("Error checking admin status", err);
@@ -82,13 +86,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async () => {
+  const login = async (email: string, password: string): Promise<{ error: string | null }> => {
     try {
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-    } catch (error) {
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
+    } catch (error: any) {
       console.error("Login failed:", error);
+      return { error: error.message || "Login failed" };
     }
   };
 

@@ -66,86 +66,93 @@ export default function AdminVideos() {
     }
   };
 
-  if (loading) return <div className="py-12 text-center text-gray-500">Loading videos...</div>;
+  if (loading) return <div className="py-12 text-center font-medium" style={{color: '#ffffff99'}}>Loading videos...</div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-serif">Manage TikTok Videos</h2>
+        <div>
+          <h2 className="text-3xl font-bold" style={{color: '#ffffff'}}>TikTok Videos</h2>
+          <p className="text-base mt-2 font-medium" style={{color: '#ffffff99'}}>Manage videos displayed in the TikTok section</p>
+        </div>
         <button 
           onClick={() => setIsAdding(!isAdding)}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-white rounded-full text-sm font-medium hover:bg-[#4a4a30] transition-colors"
+          className="flex items-center gap-2 px-5 py-3 bg-brand-accent text-brand-bg rounded-xl text-sm font-semibold hover:bg-brand-accent/90 transition-all shadow-lg hover:shadow-xl"
         >
-          <Plus size={16} /> Add Video
+          <Plus size={18} /> Add Video
         </button>
       </div>
 
       {isAdding && (
-        <form onSubmit={handleSubmit} className="mb-12 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+        <form onSubmit={handleSubmit} className="mb-12 bg-brand-bg/50 p-6 rounded-2xl border-2 border-brand-accent/20">
           <div className="grid gap-4 mb-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 uppercase tracking-wider mb-1">Title *</label>
+              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Title *</label>
               <input 
                 type="text" 
                 required 
                 value={formData.title}
                 onChange={e => setFormData({...formData, title: e.target.value})}
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
                 placeholder="e.g. Plating Masterclass"
+                style={{color: '#ffffff'}}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 uppercase tracking-wider mb-1">TikTok Video URL *</label>
+              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>TikTok Video URL *</label>
               <input 
                 type="url" 
                 required 
                 value={formData.videoUrl}
                 onChange={e => setFormData({...formData, videoUrl: e.target.value})}
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
                 placeholder="https://tiktok.com/..."
+                style={{color: '#ffffff'}}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 uppercase tracking-wider mb-1">Thumbnail Image URL *</label>
+              <label className="block text-sm font-semibold mb-2" style={{color: '#ffffff'}}>Thumbnail Image URL *</label>
               <input 
                 type="url" 
                 required 
                 value={formData.thumbnailUrl}
                 onChange={e => setFormData({...formData, thumbnailUrl: e.target.value})}
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                className="w-full px-4 py-3 rounded-xl border-2 border-brand-accent/30 bg-brand-bg/50 focus:outline-none focus:ring-2 focus:ring-brand-accent font-medium"
                 placeholder="https://..."
+                style={{color: '#ffffff'}}
               />
             </div>
           </div>
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">Cancel</button>
-            <button type="submit" className="px-6 py-2 bg-brand-ink text-white rounded-full text-sm font-medium hover:bg-black">Save Video</button>
+            <button type="button" onClick={() => setIsAdding(false)} className="px-5 py-2.5 text-sm font-semibold hover:bg-white/10 rounded-lg transition-all" style={{color: '#ffffffb3'}}>Cancel</button>
+            <button type="submit" className="px-6 py-2.5 bg-brand-accent text-brand-bg rounded-xl text-sm font-semibold hover:bg-brand-accent/90 shadow-lg transition-all">Save Video</button>
           </div>
         </form>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {videos.map(video => (
-          <div key={video.id} className="group relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-            <div className="aspect-[9/16] bg-gray-100 relative">
+          <div key={video.id} className="group relative bg-brand-bg rounded-xl overflow-hidden border-2 border-brand-accent/20 shadow-sm hover:border-brand-accent/50 transition-all">
+            <div className="aspect-[9/16] bg-brand-bg/50 relative">
               <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 bg-black/20" />
             </div>
-            <div className="p-4 bg-white">
-              <h3 className="font-medium text-gray-900 truncate">{video.title}</h3>
-              <a href={video.videoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-accent hover:underline mt-1 inline-block">View on TikTok</a>
+            <div className="p-4 bg-brand-bg">
+              <h3 className="font-medium truncate" style={{color: '#ffffff'}}>{video.title}</h3>
+              <a href={video.videoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-accent hover:text-brand-accent/80 hover:underline mt-1 inline-block font-medium">View on TikTok</a>
             </div>
             <button 
               onClick={() => handleDelete(video.id)}
-              className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-50"
+              className="absolute top-3 right-3 w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
             >
               <Trash2 size={16} />
             </button>
           </div>
         ))}
         {videos.length === 0 && !isAdding && (
-          <div className="col-span-full py-12 text-center text-gray-500 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-            No videos added yet.
+          <div className="col-span-full py-16 text-center bg-brand-bg/30 rounded-2xl border-2 border-dashed border-brand-accent/30">
+            <p className="text-lg font-bold" style={{color: '#ffffff99'}}>No videos added yet.</p>
+            <p className="text-base mt-1 font-medium" style={{color: '#ffffff99'}}>Click "Add Video" to get started.</p>
           </div>
         )}
       </div>

@@ -14,9 +14,10 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'About', href: '#about' },
-    { name: 'Menu', href: '#menu' },
+    { name: 'Menu', href: '#gallery' },
     { name: 'Reviews', href: '#reviews' },
-    { name: 'Videos', href: '#videos' },
+    { name: 'Videos', href: '#kitchen-videos' },
+    { name: 'Contact', href: '#contact' },
   ];
 
   const scrollTo = (id: string) => {

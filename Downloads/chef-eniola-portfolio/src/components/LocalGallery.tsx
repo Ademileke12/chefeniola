@@ -1,23 +1,17 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
+import { supabase } from '../supabase';
 
-const photos = [
-  'photo_1_2026-04-14_13-04-14.jpg', 'photo_2_2026-04-14_13-04-14.jpg', 
-  'photo_3_2026-04-14_13-04-14.jpg', 'photo_4_2026-04-14_13-04-14.jpg',
-  'photo_5_2026-04-14_13-04-14.jpg', 'photo_6_2026-04-14_13-04-14.jpg',
-  'photo_7_2026-04-14_13-04-14.jpg', 'photo_8_2026-04-14_13-04-14.jpg',
-  'photo_9_2026-04-14_13-04-14.jpg', 'photo_10_2026-04-14_13-04-14.jpg',
-  'photo_11_2026-04-14_13-04-14.jpg', 'photo_12_2026-04-14_13-04-14.jpg',
-  'photo_13_2026-04-14_13-04-14.jpg', 'photo_14_2026-04-14_13-04-15.jpg',
-  'photo_15_2026-04-14_13-04-15.jpg', 'photo_16_2026-04-14_13-04-15.jpg',
-  'photo_17_2026-04-14_13-04-15.jpg', 'photo_18_2026-04-14_13-04-15.jpg',
-  'photo_19_2026-04-14_13-04-15.jpg', 'photo_20_2026-04-14_13-04-15.jpg',
-  'photo_21_2026-04-14_13-04-15.jpg', 'photo_22_2026-04-14_13-04-15.jpg',
-  'photo_23_2026-04-14_13-04-15.jpg'
-];
+interface GalleryImage {
+  id: string;
+  imageurl: string;
+  createdat: string;
+}
 
 export default function LocalGallery() {
   const containerRef = useRef<HTMLElement>(null);
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Track scroll progress relative to the container
   const { scrollYProgress } = useScroll({
@@ -33,12 +27,74 @@ export default function LocalGallery() {
   
   const transforms = [y1, y2, y3, y4];
 
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('gallery')
+          .select('*')
+          .order('createdat', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching gallery:', error);
+        } else if (data && data.length > 0) {
+          setImages(data as GalleryImage[]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch gallery:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchImages();
+
+    try {
+      const channel = supabase
+        .channel('gallery_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'gallery' }, () => {
+          fetchImages();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (err) {
+      console.error('Failed to subscribe to gallery changes:', err);
+    }
+  }, []);
+
+  // Fallback photos if none in database
+  const fallbackPhotos = [
+    'photo_1_2026-04-14_13-04-14.jpg', 'photo_2_2026-04-14_13-04-14.jpg', 
+    'photo_3_2026-04-14_13-04-14.jpg', 'photo_4_2026-04-14_13-04-14.jpg',
+    'photo_9_2026-04-14_13-04-14.jpg', 'photo_10_2026-04-14_13-04-14.jpg',
+    'photo_11_2026-04-14_13-04-14.jpg', 'photo_12_2026-04-14_13-04-14.jpg',
+    'photo_13_2026-04-14_13-04-14.jpg', 'photo_14_2026-04-14_13-04-15.jpg',
+    'photo_15_2026-04-14_13-04-15.jpg', 'photo_16_2026-04-14_13-04-15.jpg',
+    'photo_17_2026-04-14_13-04-15.jpg', 'photo_18_2026-04-14_13-04-15.jpg',
+    'photo_19_2026-04-14_13-04-15.jpg', 'photo_20_2026-04-14_13-04-15.jpg',
+    'subs/photo_1_2026-04-27_15-59-26.jpg', 'subs/photo_2_2026-04-27_15-59-26.jpg',
+    'subs/photo_3_2026-04-27_15-59-26.jpg', 'subs/photo_4_2026-04-27_15-59-26.jpg',
+    'subs/photo_5_2026-04-27_15-59-26.jpg', 'subs/photo_6_2026-04-27_15-59-26.jpg',
+    'subs/photo_7_2026-04-27_15-59-26.jpg', 'subs/photo_1_2026-04-27_16-06-28.jpg',
+    'subs/photo_2_2026-04-27_16-06-28.jpg', 'subs/photo_3_2026-04-27_16-06-28.jpg',
+    'subs/photo_4_2026-04-27_16-06-28.jpg', 'subs/photo_5_2026-04-27_16-06-28.jpg',
+    'subs/photo_6_2026-04-27_16-06-28.jpg', 'subs/photo_7_2026-04-27_16-06-28.jpg',
+    'subs/photo_8_2026-04-27_16-06-28.jpg'
+  ];
+
+  const displayPhotos = images.length > 0 
+    ? images.map(img => img.imageurl) 
+    : fallbackPhotos.map(p => `/gl/${p}`);
+
   // Distribute photos into 4 columns
   const cols = [
-    photos.filter((_, i) => i % 4 === 0),
-    photos.filter((_, i) => i % 4 === 1),
-    photos.filter((_, i) => i % 4 === 2),
-    photos.filter((_, i) => i % 4 === 3),
+    displayPhotos.filter((_, i) => i % 4 === 0),
+    displayPhotos.filter((_, i) => i % 4 === 1),
+    displayPhotos.filter((_, i) => i % 4 === 2),
+    displayPhotos.filter((_, i) => i % 4 === 3),
   ];
 
   return (
@@ -92,10 +148,11 @@ export default function LocalGallery() {
                   className="group relative overflow-hidden rounded-2xl glass shadow-2xl shadow-black/80 w-full"
                 >
                   <img
-                    src={`/gl/${photo}`}
+                    src={photo}
                     className="w-full h-auto object-cover transform transition-transform duration-[2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.15]"
                     loading="lazy"
                     alt={`Culinary craft ${index}`}
+                    referrerPolicy="no-referrer"
                   />
                   <div className="opacity-0 group-hover:opacity-100 absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-700 ease-out" />
                 </motion.div>

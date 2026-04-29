@@ -8,7 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "supabase:login": "supabase login",
+    "supabase:link": "supabase link",
+    "supabase:types": "supabase gen types typescript --linked > src/types/supabase.ts",
+    "supabase:status": "supabase db status",
+    "setup": "./setup-supabase.sh",
+    "migrate": "node migrate-videos.js",
+    "create-admin": "node create-admin-user.js"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -30,6 +37,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "supabase": "^2.95.5",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

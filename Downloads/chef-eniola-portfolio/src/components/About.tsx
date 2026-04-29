@@ -16,10 +16,9 @@ export default function About() {
             className="aspect-[3/4] rounded-[2rem] overflow-hidden"
           >
             <img
-              src="https://images.unsplash.com/photo-1581299894007-aaa50297cf16?q=80&w=1000&auto=format&fit=crop"
+              src="/gl/enny.png"
               alt="Chef Eniola plating a dish"
               className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
             />
           </motion.div>
           
