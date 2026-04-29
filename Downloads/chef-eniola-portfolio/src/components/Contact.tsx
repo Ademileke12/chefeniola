@@ -110,12 +110,12 @@ export default function Contact() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.3 }}
-          className="text-center bg-gradient-to-br from-brand-accent/10 to-brand-accent/5 rounded-3xl p-12 md:p-16 border border-brand-accent/20"
+          className="text-center bg-gradient-to-br from-brand-accent/10 to-brand-accent/5 rounded-2xl md:rounded-3xl p-8 md:p-16 border border-brand-accent/20"
         >
-          <h3 className="text-3xl md:text-4xl font-serif text-white mb-4">
+          <h3 className="text-2xl md:text-4xl font-serif text-white mb-3 md:mb-4">
             Ready to Get Started?
           </h3>
-          <p className="text-white/70 mb-8 text-lg max-w-xl mx-auto">
+          <p className="text-white/70 mb-6 md:mb-8 text-base md:text-lg max-w-xl mx-auto px-2">
             Let's discuss your event details, menu preferences, and create an unforgettable culinary experience together
           </p>
           
@@ -125,13 +125,13 @@ export default function Contact() {
             rel="noopener noreferrer"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="inline-flex items-center gap-3 px-8 py-4 bg-brand-accent hover:bg-brand-accent/90 text-white rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300"
+            className="inline-flex items-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 bg-brand-accent hover:bg-brand-accent/90 text-white rounded-full font-semibold text-base md:text-lg shadow-lg hover:shadow-xl transition-all duration-300"
           >
-            <MessageCircle size={24} />
+            <MessageCircle size={20} className="md:w-6 md:h-6" />
             <span>Chat on WhatsApp</span>
           </motion.a>
 
-          <p className="text-white/50 text-sm mt-6">
+          <p className="text-white/50 text-xs md:text-sm mt-4 md:mt-6 px-4">
             Available for bookings • Quick response guaranteed
           </p>
         </motion.div>

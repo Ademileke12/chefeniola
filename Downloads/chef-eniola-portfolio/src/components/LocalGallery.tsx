@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { supabase } from '../supabase';
+import { optimizeSupabaseImage } from '../lib/imageOptimizer';
 
 interface GalleryImage {
   id: string;
@@ -148,7 +149,7 @@ export default function LocalGallery() {
                   className="group relative overflow-hidden rounded-2xl glass shadow-2xl shadow-black/80 w-full"
                 >
                   <img
-                    src={photo}
+                    src={optimizeSupabaseImage(photo, { width: 800, quality: 85 })}
                     className="w-full h-auto object-cover transform transition-transform duration-[2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.15]"
                     loading="lazy"
                     alt={`Culinary craft ${index}`}

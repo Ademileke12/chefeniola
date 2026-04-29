@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { supabase } from '../supabase';
 import { MessageCircle } from 'lucide-react';
+import { optimizeSupabaseImage } from '../lib/imageOptimizer';
 
 interface ImageReview {
   id: string;
@@ -99,7 +100,7 @@ export default function ImageReviews() {
               className="group relative aspect-[3/4] rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 bg-brand-surface border border-white/10"
             >
               <img
-                src={review.imageurl}
+                src={optimizeSupabaseImage(review.imageurl, { width: 600, quality: 80 })}
                 alt={review.customername || 'Customer review'}
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
                 referrerPolicy="no-referrer"

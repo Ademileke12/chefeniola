@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { Trash2, Plus, Upload, AlertCircle } from 'lucide-react';
+import { compressImage } from '../../lib/imageOptimizer';
 
 interface GalleryImage {
   id: string;
@@ -56,13 +57,16 @@ export default function AdminGallery() {
   };
 
   const uploadImageFile = async (file: File): Promise<string> => {
+    // Compress image before upload
+    const compressedBlob = await compressImage(file, 1920, 1920, 0.85);
+    
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
     const filePath = `gallery/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('videos')
-      .upload(filePath, file);
+      .upload(filePath, compressedBlob);
 
     if (uploadError) throw uploadError;
 
