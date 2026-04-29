@@ -59,10 +59,14 @@ export default function ProductBuilderWizard({
     
     const CATEGORIES = [
         { id: 'all', label: 'All Categories' },
-        { id: 'mens', label: "Men's Clothing" },
-        { id: 'womens', label: "Women's Clothing" },
-        { id: 'kids', label: "Kids & Baby" },
-        { id: 'unisex', label: "Unisex" },
+        { id: 'tshirts', label: 'T-Shirts' },
+        { id: 'hoodies', label: 'Hoodies' },
+        { id: 'crewnecks', label: 'Crewnecks & Sweatshirts' },
+        { id: 'hats', label: 'Hats & Beanies' },
+        { id: 'canvas', label: 'Canvas' },
+        { id: 'posters', label: 'Posters' },
+        { id: 'mugs', label: 'Mugs' },
+        { id: 'cards', label: 'Cards' },
     ]
     
     const filteredProducts = gelatoProducts.filter(p => {
@@ -74,14 +78,25 @@ export default function ProductBuilderWizard({
         let matchesCategory = true
         if (selectedCategory !== 'all') {
             const category = p.category?.toLowerCase() || ''
-            if (selectedCategory === 'mens') {
-                matchesCategory = category.includes("men's") || category.includes('men')
-            } else if (selectedCategory === 'womens') {
-                matchesCategory = category.includes("women's") || category.includes('women') || category.includes('ladies')
-            } else if (selectedCategory === 'kids') {
-                matchesCategory = category.includes('kids') || category.includes('baby')
-            } else if (selectedCategory === 'unisex') {
-                matchesCategory = category.includes('unisex')
+            const title = p.title.toLowerCase()
+            const textToSearch = `${category} ${title}`
+
+            if (selectedCategory === 'tshirts') {
+                matchesCategory = (textToSearch.includes('t-shirt') || textToSearch.includes('tshirt') || textToSearch.includes('tee')) && !textToSearch.includes('sweatshirt')
+            } else if (selectedCategory === 'hoodies') {
+                matchesCategory = textToSearch.includes('hoodie') || textToSearch.includes('hooded')
+            } else if (selectedCategory === 'crewnecks') {
+                matchesCategory = textToSearch.includes('crewneck') || textToSearch.includes('sweatshirt')
+            } else if (selectedCategory === 'hats') {
+                matchesCategory = textToSearch.includes('hat') || textToSearch.includes('cap') || textToSearch.includes('beanie')
+            } else if (selectedCategory === 'canvas') {
+                matchesCategory = textToSearch.includes('canvas')
+            } else if (selectedCategory === 'posters') {
+                matchesCategory = textToSearch.includes('poster')
+            } else if (selectedCategory === 'mugs') {
+                matchesCategory = textToSearch.includes('mug') || textToSearch.includes('cup')
+            } else if (selectedCategory === 'cards') {
+                matchesCategory = textToSearch.includes('card')
             }
         }
         
