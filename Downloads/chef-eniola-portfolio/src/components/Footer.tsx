@@ -23,10 +23,10 @@ export default function Footer() {
             transition={{ delay: 0.1 }}
             className="flex items-center gap-6"
           >
-            <a href="#" className="w-10 h-10 rounded-full border border-brand-ink/20 flex items-center justify-center hover:bg-brand-ink hover:text-brand-bg transition-colors">
+            <a href="https://www.instagram.com/ennys_delish_?igsh=MTYzbGIwcDR1bGxkMA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-brand-ink/20 flex items-center justify-center hover:bg-brand-ink hover:text-brand-bg transition-colors">
               <Instagram size={18} />
             </a>
-            <a href="#" className="w-10 h-10 rounded-full border border-brand-ink/20 flex items-center justify-center hover:bg-brand-ink hover:text-brand-bg transition-colors">
+            <a href="https://www.tiktok.com/@ennys_delish" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full border border-brand-ink/20 flex items-center justify-center hover:bg-brand-ink hover:text-brand-bg transition-colors">
               <Music2 size={18} />
             </a>
           </motion.div>
