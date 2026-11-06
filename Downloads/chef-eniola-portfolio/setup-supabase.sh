@@ -23,8 +23,8 @@ read -p "Enter your Supabase Project URL: " SUPABASE_URL
 read -p "Enter your Supabase Anon Key: " SUPABASE_ANON_KEY
 
 # Update .env file
-sed -i.bak "s|VITE_SUPABASE_URL=.*|VITE_SUPABASE_URL=$SUPABASE_URL|" .env
-sed -i.bak "s|VITE_SUPABASE_ANON_KEY=.*|VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY|" .env
+sed -i.bak "s|SUPABASE_URL=.*|SUPABASE_URL=$SUPABASE_URL|" .env
+sed -i.bak "s|SUPABSE_ANON_KEY=.*|SUPABSE_ANON_KEY=$SUPABASE_ANON_KEY|" .env
 
 # Remove backup file
 rm -f .env.bak
