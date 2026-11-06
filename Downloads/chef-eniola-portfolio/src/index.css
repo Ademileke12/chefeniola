@@ -65,3 +65,22 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb:hover {
   background: #A0805C;
 }
+
+/* Touchscreens have no hover state, so keep card delete controls visible there. */
+@media (hover: none), (pointer: coarse) {
+  .group > button.opacity-0 {
+    opacity: 1;
+  }
+}
+
+/* On desktop, reveal the delete controls when the card is hovered or focused. */
+@media (hover: hover) and (pointer: fine) {
+  .group > button.opacity-0 {
+    opacity: 0;
+  }
+
+  .group:hover > button.opacity-0,
+  .group:focus-within > button.opacity-0 {
+    opacity: 1;
+  }
+}
