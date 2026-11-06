@@ -17,8 +17,8 @@ dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const adminEmail = process.env.VITE_MASTER_ADMIN_EMAIL;
-const adminPassword = process.env.VITE_MASTER_ADMIN_PASSWORD;
+const adminEmail = process.env.MASTER_ADMIN_EMAIL;
+const adminPassword = process.env.MASTER_ADMIN_PASSWORD;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Error: Missing Supabase credentials in .env file');
@@ -28,7 +28,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 if (!adminEmail || !adminPassword) {
   console.error('❌ Error: Missing admin credentials in .env file');
-  console.error('Please set VITE_MASTER_ADMIN_EMAIL and VITE_MASTER_ADMIN_PASSWORD');
+  console.error('Please set MASTER_ADMIN_EMAIL and MASTER_ADMIN_PASSWORD');
   process.exit(1);
 }
 
