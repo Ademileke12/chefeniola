@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta as any).env.SUPABASE_URL || 'https://placeholder-domain.supabase.co';
-const supabaseAnonKey = (import.meta as any).env.SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = (import.meta as any).env.SUPABASE_URL || (import.meta as any).env.VITE_SUPABASE_URL || 'https://placeholder-domain.supabase.co';
+const supabaseAnonKey = (import.meta as any).env.SUPABASE_ANON_KEY || (import.meta as any).env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
 if (supabaseUrl === 'https://placeholder-domain.supabase.co') {
   console.warn('Supabase URL or Anon Key is missing. Check your environment variables.');

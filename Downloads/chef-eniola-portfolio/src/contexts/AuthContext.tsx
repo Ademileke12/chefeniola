@@ -26,7 +26,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         setUser(session?.user ?? null);
@@ -41,7 +40,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       });
 
-    // Listen to auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -59,19 +57,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAdminStatus = async (currentUser: User) => {
     try {
-      const masterAdminEmail = import.meta.env.VITE_MASTER_ADMIN_EMAIL || 'oluwafemieniolavico@gmail.com';
-      
+      const masterAdminEmail =
+        (import.meta as any).env.MASTER_ADMIN_EMAIL ||
+        (import.meta as any).env.VITE_MASTER_ADMIN_EMAIL ||
+        'oluwafemieniolavico@gmail.com';
+
       if (currentUser.email === masterAdminEmail) {
-        // Master admin from environment variable
         setIsAdmin(true);
       } else {
-        // Check from DB for other admins
         const { data, error } = await supabase
           .from('users')
           .select('role')
           .eq('id', currentUser.id)
           .single();
-          
+
         if (!error && data?.role === 'admin') {
           setIsAdmin(true);
         } else {
@@ -79,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (err) {
-      console.error("Error checking admin status", err);
+      console.error('Error checking admin status', err);
       setIsAdmin(false);
     } finally {
       setLoading(false);
@@ -99,8 +98,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error: null };
     } catch (error: any) {
-      console.error("Login failed:", error);
-      return { error: error.message || "Login failed" };
+      console.error('Login failed:', error);
+      return { error: error.message || 'Login failed' };
     }
   };
 
@@ -108,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await supabase.auth.signOut();
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error('Logout failed:', error);
     }
   };
 
